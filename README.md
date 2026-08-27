@@ -87,7 +87,7 @@ In a second terminal, expose the API URL to the client and start the interface:
 NEXT_PUBLIC_API_BASE_URL=http://localhost:5000/api npm run dev
 ```
 
-The seed command creates the University of Ibadan workspace and a local demonstration administrator. The seed output identifies the account; change its password before using a shared environment.
+Before running the seed command, set `JWT_SECRET` to a private value of at least 32 characters and `SEED_ADMIN_PASSWORD` to a private value of at least 12 characters in your local `.env` file. The seed creates the University of Ibadan workspace and a generic local administrator; no reusable password is stored in the repository.
 
 ## Environment variables
 
@@ -96,6 +96,7 @@ The seed command creates the University of Ibadan workspace and a local demonstr
 | `NEXT_PUBLIC_API_BASE_URL` | Browser-visible base URL ending in `/api`. |
 | `MONGODB_URI` | MongoDB or MongoDB Atlas connection string. |
 | `JWT_SECRET` | At least 32 random characters used to sign access tokens. |
+| `SEED_ADMIN_PASSWORD` | Private local password used only while creating the demonstration administrator. |
 | `CLIENT_ORIGIN` | Comma-separated client origins accepted by CORS. |
 | `PORT` | Express port; defaults to `5000`. |
 | `IMAGE_EMBEDDING_API_URL` | Optional external image-embedding service. |

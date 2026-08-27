@@ -1,0 +1,115 @@
+import { randomBytes } from "node:crypto";
+import { Router } from "express";
+import { z } from "zod";
+import { asyncRoute, AppError } from "../lib/errors.js";
+import { requireAdmin, requireAuth } from "../middleware/auth.js";
+import { Claim } from "../models/claim.js";
+import { Handover } from "../models/handover.js";
+import { Match } from "../models/match.js";
+import { Notification } from "../models/notification.js";
+import { Report } from "../models/report.js";
+
+const router = Router();
+router.use(requireAuth, requireAdmin);
+
+router.get(
+  "/claims",
+  asyncRoute(async (request, response) => {
+    const status = z.enum(["pending", "approved", "rejected", "more_evidence"]).optional().parse(request.query.status);
+    const matches = await Match.find({ university: request.auth!.universityId }).distinct("_id");
+    const filter: Record<string, unknown> = { match: { $in: matches } };
+    if (status) filter.status = status;
+    const claims = await Claim.find(filter)
+      .select("+privateDetail +proofUrls +reviewNote")
+      .populate("claimant", "fullName email matricNumber verified")
+      .populate({ path: "match", populate: [{ path: "lostReport", select: "+privateDetails title category publicDescription location happenedAt" }, { path: "foundReport", select: "+privateDetails title category publicDescription location happenedAt reporter" }] })
+      .sort({ createdAt: 1 })
+      .lean();
+    response.json({ data: claims });
+  }),
+);
+
+const reviewSchema = z.object({
+  status: z.enum(["approved", "rejected", "more_evidence"]),
+  reviewNote: z.string().trim().min(3).max(1000),
+  handoverPoint: z.string().trim().min(3).max(150).optional(),
+  scheduledFor: z.coerce.date().optional(),
+});
+
+router.patch(
+  "/claims/:claimId",
+  asyncRoute(async (request, response) => {
+    const input = reviewSchema.parse(request.body);
+    if (input.status === "approved" && (!input.handoverPoint || !input.scheduledFor)) {
+      throw new AppError(422, "An approved claim needs a handover point and time.", "HANDOVER_REQUIRED");
+    }
+    const claim = await Claim.findById(request.params.claimId).select("+privateDetail +reviewNote");
+    if (!claim) throw new AppError(404, "Claim not found.", "CLAIM_NOT_FOUND");
+    const match = await Match.findOne({ _id: claim.match, university: request.auth!.universityId });
+    if (!match) throw new AppError(403, "This claim belongs to another university.", "FORBIDDEN");
+
+    claim.status = input.status;
+    claim.reviewNote = input.reviewNote;
+    claim.reviewer = request.auth!.userId as never;
+    claim.reviewedAt = new Date();
+    await claim.save();
+
+    if (input.status === "approved") {
+      match.status = "approved";
+      await match.save();
+      await Handover.findOneAndUpdate(
+        { claim: claim._id },
+        {
+          $setOnInsert: {
+            claim: claim._id,
+            handoverPoint: input.handoverPoint,
+            scheduledFor: input.scheduledFor,
+            auditCode: `CF-${randomBytes(4).toString("hex").toUpperCase()}`,
+          },
+        },
+        { upsert: true, new: true },
+      );
+      await Notification.create({
+        user: claim.claimant,
+        kind: "claim",
+        title: "Your claim was approved",
+        message: `Your item can be collected at ${input.handoverPoint}.`,
+        actionPath: `/claims/${claim._id}`,
+      });
+    } else {
+      match.status = input.status === "rejected" ? "rejected" : "reviewing";
+      await match.save();
+      await Notification.create({
+        user: claim.claimant,
+        kind: "claim",
+        title: input.status === "rejected" ? "Claim not approved" : "More evidence is needed",
+        message: input.reviewNote,
+        actionPath: `/claims/${claim._id}`,
+      });
+    }
+    response.json({ data: { id: claim.id, status: claim.status, reviewedAt: claim.reviewedAt } });
+  }),
+);
+
+router.patch(
+  "/handovers/:handoverId/confirm",
+  asyncRoute(async (request, response) => {
+    const input = z.object({ party: z.enum(["finder", "owner"]) }).parse(request.body);
+    const handover = await Handover.findById(request.params.handoverId);
+    if (!handover) throw new AppError(404, "Handover not found.", "HANDOVER_NOT_FOUND");
+    if (input.party === "finder") handover.finderConfirmedAt = new Date();
+    if (input.party === "owner") handover.ownerConfirmedAt = new Date();
+    if (handover.finderConfirmedAt && handover.ownerConfirmedAt) {
+      handover.completedAt = new Date();
+      const claim = await Claim.findById(handover.claim);
+      if (claim) {
+        const match = await Match.findById(claim.match);
+        if (match) await Report.updateMany({ _id: { $in: [match.lostReport, match.foundReport] } }, { status: "returned" });
+      }
+    }
+    await handover.save();
+    response.json({ data: handover });
+  }),
+);
+
+export default router;
