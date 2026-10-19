@@ -26,9 +26,9 @@ function verifyPresignedPut(url: URL, secret: string, contentType: string) {
   const credential = params.get("X-Amz-Credential")!.split("/");
   const date = params.get("X-Amz-Date")!;
   const scope = credential.slice(1).join("/");
-  const canonicalHeaders = `content-type:${contentType}\\nhost:${url.host}\\n`;
-  const canonicalRequest = ["PUT", url.pathname, canonicalQuery(params), canonicalHeaders, "content-type;host", "UNSIGNED-PAYLOAD"].join("\\n");
-  const stringToSign = ["AWS4-HMAC-SHA256", date, scope, createHash("sha256").update(canonicalRequest).digest("hex")].join("\\n");
+  const canonicalHeaders = `content-type:${contentType}\nhost:${url.host}\n`;
+  const canonicalRequest = ["PUT", url.pathname, canonicalQuery(params), canonicalHeaders, "content-type;host", "UNSIGNED-PAYLOAD"].join("\n");
+  const stringToSign = ["AWS4-HMAC-SHA256", date, scope, createHash("sha256").update(canonicalRequest).digest("hex")].join("\n");
   const dateKey = createHmac("sha256", `AWS4${secret}`).update(credential[1]!).digest();
   const regionKey = createHmac("sha256", dateKey).update(credential[2]!).digest();
   const serviceKey = createHmac("sha256", regionKey).update("s3").digest();
