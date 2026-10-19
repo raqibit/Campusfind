@@ -25,7 +25,7 @@ const loginSchema = z.object({
 router.get(
   "/universities",
   asyncRoute(async (_request, response) => {
-    const universities = await University.find({ active: true }).select("name shortName campuses").sort({ name: 1 }).lean();
+    const universities = await University.find({ active: true, shortName: "UI" }).select("name shortName campuses").sort({ name: 1 }).lean();
     response.json({ data: universities });
   }),
 );
@@ -34,8 +34,8 @@ router.post(
   "/register",
   asyncRoute(async (request, response) => {
     const input = registerSchema.parse(request.body);
-    const university = await University.findById(input.universityId);
-    if (!university?.active) throw new AppError(422, "Choose an active university.", "INVALID_UNIVERSITY");
+    const university = await University.findOne({ _id: input.universityId, shortName: "UI", active: true });
+    if (!university) throw new AppError(422, "CampusFind registration is currently limited to the University of Ibadan.", "INVALID_UNIVERSITY");
 
     const passwordHash = await bcrypt.hash(input.password, 12);
     const user = await User.create({
@@ -76,6 +76,7 @@ router.post(
 
     const university = user.university as unknown as { _id: Types.ObjectId; name: string; shortName: string; active: boolean };
     if (!university.active) throw new AppError(403, "This university workspace is inactive.", "UNIVERSITY_INACTIVE");
+    if (university.shortName !== "UI") throw new AppError(403, "CampusFind is currently available only within the University of Ibadan.", "UNIVERSITY_OUT_OF_SCOPE");
     const token = signAccessToken({ sub: user.id, universityId: university._id.toString(), role: user.role });
     response.json({
       data: {
