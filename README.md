@@ -124,6 +124,58 @@ Example provider settings (replace placeholders; never commit real values):
 
 Storage provider permissions must allow the configured access key to PUT, GET and HEAD objects in the configured bucket. Avoid public bucket policies; the application generates expiring URLs when authorized.
 
+### MinIO live smoke test
+
+The repository includes a local MinIO service and a live test that exercises the real API and object store. Run this against a **development/test database and bucket only**: the test creates a claim and leaves the test object and claim in place for inspection.
+
+1. Create an untracked root `.env` file (it is ignored by Git) with locally generated values. Do not paste secrets into chat or commit them:
+
+   ```dotenv
+   MINIO_ROOT_USER=replace-with-a-local-only-username
+   MINIO_ROOT_PASSWORD=replace-with-a-long-random-local-password
+   S3_ENDPOINT=http://127.0.0.1:9000
+   S3_REGION=us-east-1
+   S3_BUCKET=campusfind-private
+   S3_ACCESS_KEY_ID=use-the-local-MinIO-username
+   S3_SECRET_ACCESS_KEY=use-the-local-MinIO-password
+   S3_FORCE_PATH_STYLE=true
+   ```
+
+   For this isolated local smoke test only, the MinIO root credentials can be used by the API. For shared/staging environments, create a dedicated MinIO service account with only the required bucket permissions; do not use root credentials.
+
+2. Start MinIO and create the private bucket:
+
+   ```bash
+   docker compose --env-file .env -f docker-compose.minio.yml up -d
+   ```
+
+   MinIO's API is bound to loopback at `http://127.0.0.1:9000`; its console is at `http://127.0.0.1:9001`. The compose initialiser creates the bucket and explicitly sets anonymous access to private.
+
+3. Start CampusFind's API using the same root `.env`, with a disposable MongoDB and a valid `JWT_SECRET`. The API's `S3_ENDPOINT` must be reachable from the API process. For an API running in another container on the same Compose network, use `http://minio:9000` instead of `http://127.0.0.1:9000`; the browser-facing signed upload URL must also resolve from the machine running the test.
+
+4. Prepare a fresh match owned by a test claimant, and a same-university administrator account. Log in using the normal API/UI, then export their JWTs and the match ID in your local shell. Do not put token values in source files or command history:
+
+   ```bash
+   export CAMPUSFIND_API_URL=http://127.0.0.1:5000/api
+   read -rsp "Claimant JWT: " CAMPUSFIND_CLAIMANT_TOKEN; echo
+   export CAMPUSFIND_CLAIMANT_TOKEN
+   read -rsp "Administrator JWT: " CAMPUSFIND_ADMIN_TOKEN; echo
+   export CAMPUSFIND_ADMIN_TOKEN
+   read -rp "Fresh match ID owned by claimant: " CAMPUSFIND_MATCH_ID
+   export CAMPUSFIND_MATCH_ID
+   ```
+
+5. Run the test:
+
+   ```bash
+   npm run storage:smoke-test
+   ```
+
+   The test requests a signed upload URL, uploads a small PDF directly to MinIO, creates a claim so the API checks object existence/content type/size using a signed HEAD request, verifies that anonymous requests receive HTTP 401 and a student cannot request the evidence link (HTTP 403), then downloads the same bytes using a same-university administrator's five-minute signed URL.
+
+A successful result ends with `PASS`. If MinIO or the API is not configured, the test intentionally fails instead of reporting a false pass. The test creates a claim for the selected match, so use a disposable database and a fresh match per run.
+
+
 
 ## API surface
 
