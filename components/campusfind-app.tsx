@@ -725,13 +725,14 @@ function AdminView({ onBack, session }: { onBack: () => void; session: ApiSessio
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [evidenceUrls, setEvidenceUrls] = useState<Record<string, string>>({});
+  const sessionToken = session?.token;
+  const sessionRole = session?.user.role;
   useEffect(() => {
-    if (!apiConfigured || !session || session.token === "campusfind-demo-session" || session.user.role !== "admin") return;
+    if (!apiConfigured || !sessionToken || sessionToken === "campusfind-demo-session" || sessionRole !== "admin") return;
     let active = true;
-    setLoading(true);
-    void listAdminClaims(session.token).then((items) => { if (active) setClaims(items); }).catch((issue) => { if (active) setError(issue instanceof Error ? issue.message : "The review queue could not be loaded."); }).finally(() => { if (active) setLoading(false); });
+    void listAdminClaims(sessionToken).then((items) => { if (active) setClaims(items); }).catch((issue) => { if (active) setError(issue instanceof Error ? issue.message : "The review queue could not be loaded."); }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [session?.token, session?.user.role]);
+  }, [sessionToken, sessionRole]);
   async function revealEvidence(claimId: string, index: number) {
     if (!session) return;
     const key = `${claimId}:${index}`;
