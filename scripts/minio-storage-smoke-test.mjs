@@ -67,7 +67,8 @@ async function main() {
   assert.ok(testPdf.length <= maxBytes, "test fixture must be within upload limit");
   assert.equal(expiresInSeconds, 300);
   const signedUpload = new URL(uploadUrl);
-  assert.equal(signedUpload.protocol, "http:" , "MinIO smoke test expects HTTP locally; use HTTPS for remote deployments");
+  assert.ok(signedUpload.protocol === "http:" || signedUpload.protocol === "https:", "upload URL must use HTTP or HTTPS");
+  if (signedUpload.protocol === "http:") assert.ok(["localhost", "127.0.0.1", "minio"].includes(signedUpload.hostname), "plain HTTP is allowed only for local MinIO endpoints");
   assert.ok(signedUpload.pathname.includes("/claim-evidence/"), "upload URL must target the private evidence prefix");
 
   console.log("2/5 Uploading a small PDF directly to MinIO…");
