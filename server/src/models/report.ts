@@ -26,6 +26,7 @@ const reportSchema = new Schema(
     },
     happenedAt: { type: Date, required: true, index: true },
     imageUrls: [{ type: String, trim: true }],
+    imageKeys: [{ type: String, trim: true }],
     imageEmbedding: { type: [Number], select: false, default: undefined },
     status: {
       type: String,
