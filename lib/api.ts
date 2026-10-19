@@ -181,6 +181,22 @@ export async function uploadFile(token: string, file: File, purpose: "report-ima
   return signed.data.key;
 }
 
+export interface ApiAdminClaim {
+  _id: string;
+  status: "pending" | "approved" | "rejected" | "more_evidence";
+  privateDetail: string;
+  reviewNote?: string;
+  evidenceCount: number;
+  createdAt: string;
+  claimant?: { fullName?: string; email?: string; matricNumber?: string };
+  match?: { lostReport?: { title?: string; category?: ItemCategory }; foundReport?: { title?: string; category?: ItemCategory } };
+}
+
+export async function listAdminClaims(token: string) {
+  const response = await request<{ data: ApiAdminClaim[] }>("/admin/claims", {}, token);
+  return response.data;
+}
+
 export async function getClaimEvidenceUrl(token: string, claimId: string, index: number) {
   const response = await request<{ data: { url: string; expiresInSeconds: number } }>(`/admin/claims/${encodeURIComponent(claimId)}/evidence/${index}`, {}, token);
   return response.data;
