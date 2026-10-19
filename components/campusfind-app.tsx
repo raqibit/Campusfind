@@ -39,6 +39,8 @@ import {
 import {
   apiConfigured,
   listReports,
+  listMyMatches,
+  createClaim,
   listNotifications,
   markNotificationRead,
   markAllNotificationsRead,
@@ -159,6 +161,7 @@ export default function CampusFindApp() {
   const [reports, setReports] = useState(seedReports);
   const [notifications, setNotifications] = useState(seedNotifications);
   const [selectedReport, setSelectedReport] = useState(seedReports[2]);
+  const [claimTarget, setClaimTarget] = useState<ItemReport>(seedReports[1]);
   const [reportType, setReportType] = useState<ReportType>("lost");
   const [authReason, setAuthReason] = useState<AuthReason | null>(null);
   const [protectedDestination, setProtectedDestination] = useState<Screen>("home");
@@ -231,40 +234,55 @@ export default function CampusFindApp() {
   }
 
   async function addReport(report: ItemReport, happenedAt: string) {
-    let message = "Your report is live";
-    if (apiConfigured && session && session.token !== "campusfind-demo-session") {
+    let savedReport = report;
+    let message = "Demo report published locally";
+    if (apiConfigured) {
+      if (!session || session.token === "campusfind-demo-session") {
+        showToast("Sign in with a real CampusFind account before publishing.");
+        return;
+      }
       try {
         const result = await publishReport(session.token, {
-          type: report.type,
-          title: report.title,
-          category: report.category,
-          publicDescription: report.description,
-          location: { label: report.location },
-          happenedAt,
-          imageUrls: [],
+          type: report.type, title: report.title, category: report.category,
+          publicDescription: report.description, location: { label: report.location },
+          happenedAt, imageUrls: [],
         });
+        savedReport = mapApiReport(result.data);
         message = result.meta.matchesCreated
-          ? `${result.meta.matchesCreated} possible match found`
-          : "Report saved and matching has started";
-      } catch {
-        message = "Saved on this device; sync will retry later";
+          ? `${result.meta.matchesCreated} possible match${result.meta.matchesCreated === 1 ? "" : "es"} found`
+          : "Report saved; matching has started";
+        setReports((items) => [savedReport, ...items.filter((item) => item.id !== savedReport.id)]);
+      } catch (error) {
+        showToast(error instanceof Error ? error.message : "The report could not be published. Please try again.");
+        return;
       }
+    } else {
+      setReports((items) => [savedReport, ...items]);
+      setNotifications((items) => [{
+        id: `notice-${Date.now()}`, title: "Demo report published",
+        message: `Demo mode is comparing ${report.title.toLowerCase()} with sample campus reports.`,
+        time: "Just now", kind: "system", read: false,
+      }, ...items]);
     }
-    setReports((items) => [report, ...items]);
-    setNotifications((items) => [
-      {
-        id: `notice-${Date.now()}`,
-        title: "Your report is active",
-        message: `We are comparing ${report.title.toLowerCase()} with campus reports.`,
-        time: "Just now",
-        kind: "system",
-        read: false,
-      },
-      ...items,
-    ]);
-    setSelectedReport(report);
+    setSelectedReport(savedReport);
     showToast(message);
     navigate("detail");
+  }
+
+  async function submitClaim(privateDetail: string) {
+    if (!apiConfigured) {
+      showToast("Demo claim submitted for simulated review.");
+      return "DEMO";
+    }
+    if (!session || session.token === "campusfind-demo-session") {
+      throw new Error("Sign in with a real CampusFind account to submit a claim.");
+    }
+    const matches = await listMyMatches(session.token);
+    const match = matches.find((candidate) => candidate.foundReport?._id === claimTarget.id && candidate.status !== "approved" && candidate.status !== "rejected");
+    if (!match) throw new Error("No active match links this found item to one of your lost reports. Check your matches before submitting a claim.");
+    const claim = await createClaim(session.token, { matchId: match._id, privateDetail });
+    showToast("Claim submitted for private review.");
+    return claim.id;
   }
 
   function replayOnboarding() {
