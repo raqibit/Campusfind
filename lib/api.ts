@@ -124,3 +124,27 @@ export async function publishReport(
   );
   return response;
 }
+
+
+export interface ApiNotification {
+  _id: string;
+  kind: "match" | "claim" | "handover" | "system";
+  title: string;
+  message: string;
+  actionPath?: string;
+  readAt?: string | null;
+  createdAt: string;
+}
+
+export async function listNotifications(token: string) {
+  const response = await request<{ data: ApiNotification[] }>("/notifications", {}, token);
+  return response.data;
+}
+
+export async function markNotificationRead(token: string, notificationId: string) {
+  await request<void>(`/notifications/${encodeURIComponent(notificationId)}/read`, { method: "PATCH" }, token);
+}
+
+export async function markAllNotificationsRead(token: string) {
+  await request<void>("/notifications/read-all", { method: "PATCH" }, token);
+}
