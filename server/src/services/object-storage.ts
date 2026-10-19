@@ -109,3 +109,38 @@ export function createObjectKey(scope: "report-images" | "claim-evidence", unive
 export function createPublicReportImagePath(universityId: string, userId: string, filename: string) {
   return `/api/uploads/public/${encodeURIComponent(universityId)}/${encodeURIComponent(userId)}/${encodeURIComponent(filename)}`;
 }
+
+export async function verifyUserObjects(
+  keys: string[],
+  scope: "report-images" | "claim-evidence",
+  universityId: string,
+  userId: string,
+) {
+  const maxCount = 5;
+  if (keys.length > maxCount) {
+    const error = new Error("A maximum of five files is allowed.");
+    Object.assign(error, { status: 422, code: "TOO_MANY_FILES" });
+    throw error;
+  }
+  for (const key of keys) {
+    const segments = key.split("/");
+    const filename = segments[3] ?? "";
+    if (segments.length !== 4 || segments[0] !== scope || segments[1] !== universityId || segments[2] !== userId || !/^[a-f0-9-]+\\.(jpg|png|webp|pdf)$/i.test(filename)) {
+      const error = new Error("An uploaded file does not belong to this account or file category.");
+      Object.assign(error, { status: 403, code: "INVALID_OBJECT_KEY" });
+      throw error;
+    }
+    const extension = filename.split(".").at(-1)?.toLowerCase();
+    const type = extension === "jpg" || extension === "jpeg" ? "image/jpeg"
+      : extension === "png" ? "image/png"
+      : extension === "webp" ? "image/webp"
+      : extension === "pdf" ? "application/pdf" : null;
+    const allowed = scope === "report-images" ? ["image/jpeg", "image/png", "image/webp"] : ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+    const maxBytes = type === "application/pdf" ? 5 * 1024 * 1024 : 8 * 1024 * 1024;
+    if (!type || !allowed.includes(type) || !(await verifyStoredObject(key, type, maxBytes))) {
+      const error = new Error("An uploaded file is missing, invalid, or exceeds its size limit. Upload it again.");
+      Object.assign(error, { status: 422, code: "INVALID_UPLOAD" });
+      throw error;
+    }
+  }
+}
