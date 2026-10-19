@@ -5,6 +5,7 @@ type ReportWithImages = { imageUrls?: string[]; imageKeys?: string[] };
 export async function attachReportImageUrls<T extends ReportWithImages>(report: T): Promise<Omit<T, "imageKeys"> & { imageUrls: string[] }> {
   const imageKeys = report.imageKeys ?? [];
   const signedUrls = await Promise.all(imageKeys.map((key) => createDownloadUrl(key)));
-  const { imageKeys: _storedKeys, ...safeReport } = report;
+  const safeReport = { ...report };
+  delete safeReport.imageKeys;
   return { ...safeReport, imageUrls: [...(report.imageUrls ?? []), ...signedUrls] };
 }
