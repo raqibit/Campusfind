@@ -42,6 +42,8 @@ import {
   listMyMatches,
   createClaim,
   uploadFile,
+  listAdminClaims,
+  getClaimEvidenceUrl,
   listNotifications,
   markNotificationRead,
   markAllNotificationsRead,
@@ -369,7 +371,7 @@ export default function CampusFindApp() {
               onAdmin={() => navigate("admin")}
             />
           )}
-          {screen === "admin" && <AdminView onBack={() => navigate("profile")} />}
+          {screen === "admin" && <AdminView onBack={() => navigate("profile")} session={session} />}
         </div>
 
         {topLevelScreens.includes(screen) && (
@@ -718,10 +720,37 @@ function SettingsList({ onReplay }: { onReplay: () => void }) {
   return <section className="profile-options guest-options"><button type="button" onClick={onReplay}><span><Sparkles size={18} /><span><b>Replay welcome tour</b><small>See how CampusFind works</small></span></span><ChevronRight size={17} /></button><button type="button"><span><CircleHelp size={18} /><span><b>Help & safety</b><small>Reporting and handover guidance</small></span></span><ChevronRight size={17} /></button></section>;
 }
 
-function AdminView({ onBack }: { onBack: () => void }) {
-  return <main className="mobile-page admin-page"><CompactHeader title="Review centre" onBack={onBack} /><section className="admin-summary"><p className="micro-label">Authorised reviewers</p><h1>Two claims need attention.</h1><div><span><strong>2</strong><small>Pending</small></span><span><strong>18</strong><small>Returned</small></span><span><strong>24m</strong><small>Review time</small></span></div></section>{["Black leather wallet", "White wireless earbuds"].map((item, index) => <article className="admin-claim" key={item}><div><span className="mini-avatar">{index ? "DO" : "RI"}</span><span><small>Claim #{index ? "1938" : "1942"}</small><strong>{item}</strong><p>{index ? "82" : "89"}% match · Evidence attached</p></span></div><div><button type="button" className="approve-small"><Check size={15} />Approve</button><button type="button" className="review-small">Review</button></div></article>)}</main>;
+function AdminView({ onBack, session }: { onBack: () => void; session: ApiSession | null }) {
+  const [claims, setClaims] = useState<import("@/lib/api").ApiAdminClaim[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [evidenceUrls, setEvidenceUrls] = useState<Record<string, string>>({});
+  useEffect(() => {
+    if (!apiConfigured || !session || session.token === "campusfind-demo-session" || session.user.role !== "admin") return;
+    let active = true;
+    setLoading(true);
+    void listAdminClaims(session.token).then((items) => { if (active) setClaims(items); }).catch((issue) => { if (active) setError(issue instanceof Error ? issue.message : "The review queue could not be loaded."); }).finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [session?.token, session?.user.role]);
+  async function revealEvidence(claimId: string, index: number) {
+    if (!session) return;
+    const key = `${claimId}:${index}`;
+    setError("");
+    try {
+      const result = await getClaimEvidenceUrl(session.token, claimId, index);
+      setEvidenceUrls((items) => ({ ...items, [key]: result.url }));
+    } catch (issue) {
+      setError(issue instanceof Error ? issue.message : "Private evidence could not be opened.");
+    }
+  }
+  return <main className="mobile-page admin-page"><CompactHeader title="Review centre" onBack={onBack} />
+    {!apiConfigured ? <section className="guest-state"><span><ShieldCheck size={26} /></span><h1>Demo review centre</h1><p>Real claims and private evidence are available only when the API and administrator account are configured.</p></section> : session?.user.role !== "admin" || session.token === "campusfind-demo-session" ? <section className="guest-state"><span><LockKeyhole size={26} /></span><h1>Administrator access required</h1><p>Sign in with an authorised University of Ibadan administrator account to review claims and access private evidence.</p></section> : <><section className="admin-summary"><p className="micro-label">Authorised reviewers</p><h1>Ownership review queue</h1><div><span><strong>{claims.filter((claim) => claim.status === "pending").length}</strong><small>Pending</small></span><span><strong>{claims.filter((claim) => claim.status === "more_evidence").length}</strong><small>More evidence</small></span><span><strong>{claims.length}</strong><small>Total claims</small></span></div></section>
+      {loading && <p className="step-copy">Loading claims…</p>}{error && <p role="alert" className="step-copy">{error}</p>}
+      {!loading && claims.length === 0 && !error && <p className="step-copy">No claims are waiting for review.</p>}
+      {claims.map((claim) => <article className="admin-claim" key={claim._id}><div><span className="mini-avatar">{(claim.claimant?.fullName || "CF").split(" ").map((part) => part[0]).slice(0, 2).join("").toUpperCase()}</span><span><small>Claim · {claim.status.replace("_", " ")}</small><strong>{claim.match?.foundReport?.title || claim.match?.lostReport?.title || "Campus item"}</strong><p>{claim.claimant?.fullName || "Claimant"} · {claim.match?.foundReport?.category || claim.match?.lostReport?.category || "Item"}</p><small>Private ownership detail</small><p>{claim.privateDetail}</p></span></div>
+        {claim.evidenceCount > 0 && <div className="admin-evidence"><b>Supporting evidence ({claim.evidenceCount})</b>{Array.from({ length: claim.evidenceCount }, (_, index) => { const key = `${claim._id}:${index}`; return <span key={key}><button type="button" className="review-small" onClick={() => void revealEvidence(claim._id, index)}>Get secure evidence link {index + 1}</button>{evidenceUrls[key] && <a href={evidenceUrls[key]} target="_blank" rel="noreferrer">Open file (expires in 5 minutes)</a>}</span>; })}</div>}
+        </article>)}</>}</main>;
 }
-
 function SimpleTitle({ title }: { title: string }) {
   return <header className="simple-title"><Mark compact /><h1>{title}</h1><span /></header>;
 }
