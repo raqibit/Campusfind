@@ -10,7 +10,7 @@ router.use(requireAuth);
 router.get(
   "/my",
   asyncRoute(async (request, response) => {
-    const reportIds = await Report.find({ reporter: request.auth!.userId }).distinct("_id");
+    const reportIds = await Report.find({ reporter: request.auth!.userId, university: request.auth!.universityId }).distinct("_id");
     const matches = await Match.find({
       $or: [{ lostReport: { $in: reportIds } }, { foundReport: { $in: reportIds } }],
       status: { $ne: "rejected" },
@@ -26,7 +26,7 @@ router.get(
 router.get(
   "/:matchId",
   asyncRoute(async (request, response) => {
-    const match = await Match.findById(request.params.matchId)
+    const match = await Match.findOne({ _id: request.params.matchId, university: request.auth!.universityId })
       .populate("lostReport", "title category publicDescription location happenedAt imageUrls reporter status")
       .populate("foundReport", "title category publicDescription location happenedAt imageUrls reporter status")
       .lean();
