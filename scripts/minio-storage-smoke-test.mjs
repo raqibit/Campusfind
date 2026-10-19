@@ -25,7 +25,8 @@ for (const name of required) {
   }
 }
 
-const apiBase = process.env.CAMPUSFIND_API_URL.replace(/\\/+$/, "");
+let apiBase = process.env.CAMPUSFIND_API_URL;
+while (apiBase.endsWith("/")) apiBase = apiBase.slice(0, -1);
 const claimantToken = process.env.CAMPUSFIND_CLAIMANT_TOKEN;
 const adminToken = process.env.CAMPUSFIND_ADMIN_TOKEN;
 const matchId = process.env.CAMPUSFIND_MATCH_ID;
