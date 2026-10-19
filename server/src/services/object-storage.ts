@@ -23,17 +23,17 @@ function requiredConfig() {
 function sha256(value: string) {
   return createHash("sha256").update(value).digest("hex");
 }
-function hmac(key: Buffer | string, value: string, encoding: "hex"): string;
-function hmac(key: Buffer | string, value: string): Buffer;
-function hmac(key: Buffer | string, value: string, encoding?: "hex") {
-  const digest = createHmac("sha256", key).update(value);
-  return encoding ? digest.digest(encoding) : digest.digest();
+function hmacBuffer(key: Buffer | string, value: string): Buffer {
+  return createHmac("sha256", key).update(value).digest();
+}
+function hmacHex(key: Buffer | string, value: string): string {
+  return createHmac("sha256", key).update(value).digest("hex");
 }
 function signingKey(secret: string, date: string, region: string) {
-  const dateKey = hmac(`AWS4${secret}`, date);
-  const regionKey = hmac(dateKey, region);
-  const serviceKey = hmac(regionKey, "s3");
-  return hmac(serviceKey, "aws4_request");
+  const dateKey = hmacBuffer(`AWS4${secret}`, date);
+  const regionKey = hmacBuffer(dateKey, region);
+  const serviceKey = hmacBuffer(regionKey, "s3");
+  return hmacBuffer(serviceKey, "aws4_request");
 }
 function amzDate(date: Date) {
   return date.toISOString().replace(/[:-]|\.\d{3}/g, "");
@@ -77,7 +77,7 @@ function presign(method: "GET" | "PUT" | "HEAD", key: string, contentType?: stri
   const canonicalHeaders = contentType ? `content-type:${contentType.trim()}\\nhost:${url.host}\\n` : `host:${url.host}\\n`;
   const canonicalRequest = [method, url.pathname, canonicalQuery(params), canonicalHeaders, signedHeaders, "UNSIGNED-PAYLOAD"].join("\\n");
   const stringToSign = ["AWS4-HMAC-SHA256", date, scope, sha256(canonicalRequest)].join("\\n");
-  const signature = hmac(signingKey(secretAccessKey, shortDate, env.S3_REGION), stringToSign, "hex");
+  const signature = hmacHex(signingKey(secretAccessKey, shortDate, env.S3_REGION), stringToSign);
   params.set("X-Amz-Signature", signature);
   url.search = canonicalQuery(params);
   return url.toString();
