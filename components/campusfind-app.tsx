@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
-  Apple,
   ArrowLeft,
   ArrowRight,
   BadgeCheck,
@@ -665,14 +664,6 @@ function AuthSheet({ reason, onClose, onAuthenticated }: { reason: AuthReason; o
 
   const reasonCopy = reason === "post" ? "Create an account to publish a trusted campus report." : reason === "claim" ? "Create an account so your ownership claim can be reviewed securely." : "Sign in to keep your reports and alerts in one place.";
 
-  async function apple() {
-    setLoading(true);
-    setError("");
-    await new Promise((resolve) => window.setTimeout(resolve, 650));
-    await onAuthenticated(demoSession());
-    setLoading(false);
-  }
-
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
@@ -697,5 +688,5 @@ function AuthSheet({ reason, onClose, onAuthenticated }: { reason: AuthReason; o
     }
   }
 
-  return <div className="sheet-layer" role="dialog" aria-modal="true" aria-label="Sign in to CampusFind"><button type="button" className="sheet-scrim" aria-label="Close sign in" onClick={onClose} /><section className="auth-sheet"><span className="sheet-handle" /><div className="sheet-heading"><div><Mark compact /><span><small>CampusFind</small><b>{mode === "options" ? "Join to continue" : mode === "signin" ? "Welcome back" : "Create your account"}</b></span></div><button type="button" onClick={onClose}><X size={19} /></button></div>{mode === "options" && <><p className="auth-reason">{reasonCopy}</p><button type="button" className="apple-button" onClick={apple} disabled={loading}><Apple size={19} fill="currentColor" />{loading ? "Connecting…" : "Continue with Apple"}</button><button type="button" className="email-button" onClick={() => setMode("signup")}><Mail size={18} />Continue with email</button><div className="auth-divider"><span />or<span /></div><button type="button" className="existing-link" onClick={() => setMode("signin")}>Already have an account? <b>Sign in</b></button><p className="guest-note"><ShieldCheck size={15} />You may browse CampusFind without an account.</p></>}{mode !== "options" && <form className="auth-form" onSubmit={submit}>{mode === "signup" && <><label><span>Full name</span><input name="fullName" required placeholder="Demo Student" /></label><label><span>Matric number</span><input name="matricNumber" required placeholder="UI-DEMO-001" /></label>{apiConfigured && <label><span>University</span><select name="universityId" required defaultValue=""><option value="" disabled>Choose your university</option>{universities.map((university) => <option key={university._id} value={university._id}>{university.name}</option>)}</select></label>}</>}<label><span>School email</span><input name="email" type="email" required placeholder="demo.student@example.edu" /></label><label><span>Password</span><input name="password" type="password" minLength={8} required placeholder="At least 8 characters" /></label>{error && <p className="auth-error">{error}</p>}<button type="submit" className="primary-app-button" disabled={loading}>{loading ? "Please wait…" : mode === "signin" ? "Sign in" : "Create account"}<ArrowRight size={17} /></button><button type="button" className="back-to-options" onClick={() => { setMode("options"); setError(""); }}><ArrowLeft size={15} />Other sign-in options</button>{mode === "signup" && <p className="auth-terms">By continuing, you agree to the CampusFind safety and privacy rules.</p>}</form>}</section></div>;
+  return <div className="sheet-layer" role="dialog" aria-modal="true" aria-label="Sign in to CampusFind"><button type="button" className="sheet-scrim" aria-label="Close sign in" onClick={onClose} /><section className="auth-sheet"><span className="sheet-handle" /><div className="sheet-heading"><div><Mark compact /><span><small>CampusFind</small><b>{mode === "options" ? "Join to continue" : mode === "signin" ? "Welcome back" : "Create your account"}</b></span></div><button type="button" onClick={onClose}><X size={19} /></button></div>{mode === "options" && <><p className="auth-reason">{reasonCopy}</p><button type="button" className="email-button" onClick={() => setMode("signup")}><Mail size={18} />Continue with email</button><button type="button" className="existing-link" onClick={() => setMode("signin")}>Already have an account? <b>Sign in</b></button><p className="guest-note"><ShieldCheck size={15} />You may browse CampusFind without an account.</p></>}{mode !== "options" && <form className="auth-form" onSubmit={submit}>{mode === "signup" && <><label><span>Full name</span><input name="fullName" required placeholder="Demo Student" /></label><label><span>Matric number</span><input name="matricNumber" required placeholder="UI-DEMO-001" /></label>{apiConfigured && <label><span>University</span><select name="universityId" required defaultValue=""><option value="" disabled>Choose your university</option>{universities.map((university) => <option key={university._id} value={university._id}>{university.name}</option>)}</select></label>}</>}<label><span>School email</span><input name="email" type="email" required placeholder="demo.student@example.edu" /></label><label><span>Password</span><input name="password" type="password" minLength={8} required placeholder="At least 8 characters" /></label>{error && <p className="auth-error">{error}</p>}<button type="submit" className="primary-app-button" disabled={loading}>{loading ? "Please wait…" : mode === "signin" ? "Sign in" : "Create account"}<ArrowRight size={17} /></button><button type="button" className="back-to-options" onClick={() => { setMode("options"); setError(""); }}><ArrowLeft size={15} />Other sign-in options</button>{mode === "signup" && <p className="auth-terms">By continuing, you agree to the CampusFind safety and privacy rules.</p>}</form>}</section></div>;
 }
