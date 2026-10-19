@@ -101,8 +101,29 @@ Before running the seed command, set `JWT_SECRET` to a private value of at least
 | `PORT` | Express port; defaults to `5000`. |
 | `IMAGE_EMBEDDING_API_URL` | Optional external image-embedding service. |
 | `IMAGE_EMBEDDING_API_KEY` | Optional embedding-service secret. |
+| `S3_ENDPOINT` | Optional S3-compatible endpoint (AWS S3, Cloudflare R2, MinIO, etc.). |
+| `S3_REGION` | Object-storage signing region; use the provider-required value (for Cloudflare R2, typically `auto`). |
+| `S3_BUCKET` | Private object-storage bucket name. |
+| `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | Server-only storage credentials; never expose these to the browser. |
+| `S3_SESSION_TOKEN` | Optional temporary credential session token. |
+| `S3_FORCE_PATH_STYLE` | Use `true` for compatible path-style endpoints such as MinIO/R2; configure per provider. |
 
 Never commit a populated `.env` file. `.env.example` contains names and safe local defaults only.
+
+### Object storage setup
+
+Object storage is optional for local development; text-only reports and claims continue to work without it. To enable uploads, configure the S3 endpoint, bucket, region and access credentials in the **API server environment**. The bucket should remain private. CampusFind uses five-minute signed PUT URLs for uploads and short-lived signed GET URLs for report photos. Claim evidence is stored under a separate `claim-evidence/` prefix and can only be downloaded through the authenticated, university-scoped administrator evidence endpoint.
+
+Configure bucket CORS to allow `PUT` from the exact web-client origin(s) and allow the `Content-Type` request header. Do not put S3 credentials or a storage secret in `NEXT_PUBLIC_*` variables. The API verifies uploaded object ownership, content type and size before accepting an image or evidence key. Report photos allow JPEG, PNG and WEBP up to 8 MiB; claim evidence additionally allows PDF up to 5 MiB.
+
+Example provider settings (replace placeholders; never commit real values):
+
+- AWS S3: `S3_ENDPOINT=https://s3.us-east-1.amazonaws.com`, `S3_REGION=us-east-1`, `S3_FORCE_PATH_STYLE=false`.
+- Cloudflare R2: `S3_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com`, `S3_REGION=auto`, `S3_FORCE_PATH_STYLE=true`.
+- MinIO: use the endpoint and region configured by your MinIO deployment, typically with `S3_FORCE_PATH_STYLE=true`.
+
+Storage provider permissions must allow the configured access key to PUT, GET and HEAD objects in the configured bucket. Avoid public bucket policies; the application generates expiring URLs when authorized.
+
 
 ## API surface
 
@@ -113,12 +134,14 @@ Never commit a populated `.env` file. `.env.example` contains names and safe loc
 | `POST` | `/api/auth/register` | Public | Create a student account. |
 | `POST` | `/api/auth/login` | Public | Receive a seven-day JWT. |
 | `GET` | `/api/reports` | Public | Filtered public report feed. |
+| `POST` | `/api/uploads/presign` | Signed in | Create a short-lived upload URL for an allowed file type. |
 | `POST` | `/api/reports` | Signed in | Create a report and run matching. |
 | `GET` | `/api/matches/my` | Signed in | View the user's match suggestions. |
 | `POST` | `/api/claims` | Lost-item owner | Submit private ownership evidence. |
 | `GET` | `/api/notifications` | Signed in | View match and review alerts. |
 | `GET` | `/api/admin/claims` | Administrator | Review the university claim queue. |
 | `PATCH` | `/api/admin/claims/:id` | Administrator | Decide a claim and schedule handover. |
+| `GET` | `/api/admin/claims/:claimId/evidence/:index` | Same-university administrator | Obtain a five-minute URL for private claim evidence. |
 | `PATCH` | `/api/admin/handovers/:id/confirm` | Administrator | Log finder/owner confirmation. |
 
 All write inputs are validated with Zod. Private report details, claim evidence and proof URLs are excluded from ordinary queries at the schema level.
