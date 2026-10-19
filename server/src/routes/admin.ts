@@ -25,6 +25,7 @@ router.get(
       .populate({ path: "match", populate: [{ path: "lostReport", select: "+privateDetails title category publicDescription location happenedAt" }, { path: "foundReport", select: "+privateDetails title category publicDescription location happenedAt reporter" }] })
       .sort({ createdAt: 1 })
       .lean();
+    response.setHeader("Cache-Control", "no-store");
     response.json({ data: claims.map(({ proofKeys, ...claim }) => ({ ...claim, evidenceCount: proofKeys?.length ?? 0 })) });
   }),
 );
@@ -102,6 +103,7 @@ router.get(
     if (!match) throw new AppError(404, "Claim not found.", "CLAIM_NOT_FOUND");
     const key = claim.proofKeys?.[index];
     if (!key) throw new AppError(404, "Evidence file not found.", "EVIDENCE_NOT_FOUND");
+    response.setHeader("Cache-Control", "no-store");
     response.json({ data: { url: createDownloadUrl(key), expiresInSeconds: 300 } });
   }),
 );
