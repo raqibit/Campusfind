@@ -177,21 +177,23 @@ export default function CampusFindApp() {
     return () => window.clearTimeout(timer);
   }, []);
 
+  const sessionToken = session?.token;
+  const universityId = session?.user.university.id;
   useEffect(() => {
-    if (!apiConfigured || !session || session.token === "campusfind-demo-session") return;
+    if (!apiConfigured || !sessionToken || sessionToken === "campusfind-demo-session" || !universityId) return;
     let active = true;
-    void listReports(session.user.university.id).then((items) => {
+    void listReports(universityId).then((items) => {
       if (active) setReports(items.map(mapApiReport));
     }).catch(() => {
-      if (active) showToast("Reports could not be refreshed. Check your connection and try again.");
+      // Preserve the current list when a background refresh fails.
     });
-    void listMyMatches(session.token).then((items) => {
+    void listMyMatches(sessionToken).then((items) => {
       if (active) setMatches(items);
     }).catch(() => {
       if (active) setMatches([]);
     });
     return () => { active = false; };
-  }, [session?.token, session?.user.university.id]);
+  }, [sessionToken, universityId]);
 
   const unread = notifications.filter((item) => !item.read).length;
   const primaryMatch = matches[0];
