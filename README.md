@@ -119,7 +119,7 @@ Configure bucket CORS to allow `PUT` from the exact web-client origin(s) and all
 Example provider settings (replace placeholders; never commit real values):
 
 - AWS S3: `S3_ENDPOINT=https://s3.us-east-1.amazonaws.com`, `S3_REGION=us-east-1`, `S3_FORCE_PATH_STYLE=false`.
-- Cloudflare R2: `S3_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com`, `S3_REGION=auto`, `S3_FORCE_PATH_STYLE=true`.
+- Cloudflare R2: `S3_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com`, `S3_REGION=auto`, `S3_FORCE_PATH_STYLE=false`.
 - MinIO: use the endpoint and region configured by your MinIO deployment, typically with `S3_FORCE_PATH_STYLE=true`.
 
 Storage provider permissions must allow the configured access key to PUT, GET and HEAD objects in the configured bucket. Avoid public bucket policies; the application generates expiring URLs when authorized.
