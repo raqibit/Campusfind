@@ -33,13 +33,13 @@ function signingKey(secret: string, date: string, region: string) {
   return hmac(serviceKey, "aws4_request");
 }
 function amzDate(date: Date) {
-  return date.toISOString().replace(/[:-]|\\.\\d{3}/g, "");
+  return date.toISOString().replace(/[:-]|\.\d{3}/g, "");
 }
 function objectUrl(key: string) {
   const { endpoint, bucket } = requiredConfig();
   const cleanKey = key.split("/").map(encodeURIComponent).join("/");
   const url = new URL(endpoint.toString());
-  const basePath = endpoint.pathname.replace(/\\/$/, "");
+  const basePath = endpoint.pathname.replace(/\/$/, "");
   if (env.S3_FORCE_PATH_STYLE === "true") {
     url.pathname = `${basePath}/${encodeURIComponent(bucket)}/${cleanKey}`;
   } else {
