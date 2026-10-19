@@ -235,6 +235,7 @@ export default function CampusFindApp() {
     removeSession();
     setSession(null);
     setReports(seedReports);
+    setMatches([]);
     navigate("home");
     showToast("You are browsing as a guest");
   }
@@ -318,6 +319,8 @@ export default function CampusFindApp() {
               reports={reports}
               lostReport={lostReport}
               foundReport={foundReport}
+              match={primaryMatch}
+              demoMode={!apiConfigured}
               onOpenReport={openReport}
               onNavigate={navigate}
               onReport={(type) => {
@@ -444,6 +447,8 @@ function HomeView({
   reports,
   lostReport,
   foundReport,
+  match,
+  demoMode,
   onOpenReport,
   onNavigate,
   onReport,
@@ -454,6 +459,8 @@ function HomeView({
   reports: ItemReport[];
   lostReport: ItemReport;
   foundReport: ItemReport;
+  match: ApiMatch | undefined;
+  demoMode: boolean;
   onOpenReport: (report: ItemReport) => void;
   onNavigate: (screen: Screen) => void;
   onReport: (type: ReportType) => void;
@@ -488,12 +495,12 @@ function HomeView({
         </div>
       </section>
 
-      <section className="match-preview" onClick={() => onNavigate("match")}>
-        <div className="match-preview-top"><span><Sparkles size={15} /> Smart match</span><strong>{featuredMatch.score}%</strong></div>
-        <h2>These reports may describe the same wallet.</h2>
+      {(match || demoMode) && <section className="match-preview" onClick={() => onNavigate("match")}>
+        <div className="match-preview-top"><span><Sparkles size={15} /> Smart match</span><strong>{match?.score ?? featuredMatch.score}%</strong></div>
+        <h2>{match ? `These reports may describe the same ${foundReport.category.toLowerCase()}.` : "These sample reports may describe the same wallet."}</h2>
         <div className="match-thumbnails"><ReportThumb report={lostReport} /><i /><ReportThumb report={foundReport} /></div>
         <button type="button">Review match <ArrowRight size={16} /></button>
-      </section>
+      </section>}
 
       <section className="trust-note"><ShieldCheck size={20} /><div><strong>Private by default</strong><p>Contact details and ownership proof stay hidden until a claim is reviewed.</p></div></section>
     </main>
