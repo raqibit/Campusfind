@@ -8,7 +8,6 @@ import {
   BatteryFull,
   Bell,
   BookOpen,
-  Camera,
   Check,
   CheckCircle2,
   ChevronDown,
@@ -668,10 +667,11 @@ function ClaimView({ report, onBack, onDone, showToast, onSubmit }: { report: It
   return <main className="mobile-page claim-page"><CompactHeader title="Verify ownership" onBack={onBack} /><section className="claim-item"><div><ReportImage report={report} /></div><span><small>You are claiming</small><strong>{report.title}</strong><p><MapPin size={12} />{report.location}</p></span></section><form onSubmit={submit}><div className="claim-intro"><span><LockKeyhole size={20} /></span><div><h1>Tell us something only the owner would know.</h1><p>This answer is sent privately for review and is never shown in the public report.</p></div></div><label className="claim-question"><span>Private identifying detail</span><textarea rows={5} value={privateDetail} onChange={(event) => setPrivateDetail(event.target.value)} minLength={10} maxLength={1500} required placeholder="For example: a name inside, a unique scratch or something kept in the item…" /><small>Never enter a password, card PIN or bank information. Supporting-file uploads are not connected yet.</small></label><label className="claim-check"><input type="checkbox" required /><span>I confirm that this item belongs to me and the information is truthful.</span></label><button className="primary-app-button" type="submit" disabled={submitting}>{submitting ? "Submitting…" : "Send for review"} <ArrowRight size={18} /></button></form></main>;
 }
 function AlertsView({ notifications, setNotifications, session, onMatch, onSignIn }: { notifications: NotificationItem[]; setNotifications: (update: (items: NotificationItem[]) => NotificationItem[]) => void; session: ApiSession | null; onMatch: () => void; onSignIn: () => void }) {
+  const sessionToken = session?.token;
   useEffect(() => {
-    if (!apiConfigured || !session || session.token === "campusfind-demo-session") return;
+    if (!apiConfigured || !sessionToken || sessionToken === "campusfind-demo-session") return;
     let active = true;
-    void listNotifications(session.token).then((items) => {
+    void listNotifications(sessionToken).then((items) => {
       if (!active) return;
       setNotifications(() => items.map((item) => ({
         id: item._id,
@@ -683,11 +683,11 @@ function AlertsView({ notifications, setNotifications, session, onMatch, onSignI
       })));
     }).catch(() => undefined);
     return () => { active = false; };
-  }, [session?.token]);
+  }, [sessionToken, setNotifications]);
   if (!session) return <main className="mobile-page alerts-page"><SimpleTitle title="Alerts" /><div className="guest-state"><span><Bell size={26} /></span><h1>Matches should find you.</h1><p>Sign in to receive possible-match, claim-review and handover alerts.</p><button type="button" className="primary-app-button" onClick={onSignIn}>Sign in for alerts</button><small>You can continue browsing without an account.</small></div></main>;
   async function openNotification(item: NotificationItem) {
     setNotifications((items) => items.map((notice) => notice.id === item.id ? { ...notice, read: true } : notice));
-    if (apiConfigured && session.token !== "campusfind-demo-session" && item.id.length > 20) {
+    if (apiConfigured && session && session.token !== "campusfind-demo-session" && item.id.length > 20) {
       try { await markNotificationRead(session.token, item.id); } catch { /* Keep the local read state; refresh can reconcile it. */ }
     }
     if (item.kind === "match") onMatch();
