@@ -7,7 +7,6 @@ import { Claim } from "../models/claim.js";
 import { Handover } from "../models/handover.js";
 import { Match } from "../models/match.js";
 import { Notification } from "../models/notification.js";
-import { Report } from "../models/report.js";
 
 const router = Router();
 router.use(requireAuth, requireAdmin);
