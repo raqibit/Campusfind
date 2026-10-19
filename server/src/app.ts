@@ -12,6 +12,7 @@ import matchRoutes from "./routes/matches.js";
 import handoverRoutes from "./routes/handovers.js";
 import notificationRoutes from "./routes/notifications.js";
 import reportRoutes from "./routes/reports.js";
+import uploadRoutes from "./routes/uploads.js";
 
 export function createApp() {
   const app = express();
@@ -44,6 +45,7 @@ export function createApp() {
   });
   app.use("/api/auth", authenticationLimiter, authRoutes);
   app.use("/api/reports", reportRoutes);
+  app.use("/api/uploads", uploadRoutes);
   app.use("/api/matches", matchRoutes);
   app.use("/api/claims", claimRoutes);
   app.use("/api/notifications", notificationRoutes);
