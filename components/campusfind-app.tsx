@@ -324,14 +324,14 @@ export default function CampusFindApp() {
             <DetailView
               report={selectedReport}
               onBack={() => navigate("reports")}
-              onClaim={() => requireAccount("claim", "claim")}
+              onClaim={() => { setClaimTarget(selectedReport); requireAccount("claim", "claim"); }}
             />
           )}
           {screen === "match" && lostReport && foundReport && (
-            <MatchView lost={lostReport} found={foundReport} onBack={() => navigate("home")} onClaim={() => requireAccount("claim", "claim")} />
+            <MatchView lost={lostReport} found={foundReport} onBack={() => navigate("home")} onClaim={() => { setClaimTarget(foundReport); requireAccount("claim", "claim"); }} />
           )}
           {screen === "create" && <CreateView initialType={reportType} onBack={() => navigate("home")} onPublish={addReport} />}
-          {screen === "claim" && <ClaimView report={foundReport || selectedReport} onBack={() => navigate("match")} onDone={() => navigate("notifications")} showToast={showToast} />}
+          {screen === "claim" && <ClaimView report={claimTarget} onBack={() => navigate("match")} onDone={() => navigate("notifications")} showToast={showToast} onSubmit={submitClaim} />}
           {screen === "notifications" && (
             <AlertsView notifications={notifications} setNotifications={setNotifications} session={session} onMatch={() => navigate("match")} onSignIn={() => {
               setProtectedDestination("notifications");
@@ -627,17 +627,27 @@ function CreateView({ initialType, onBack, onPublish }: { initialType: ReportTyp
   );
 }
 
-function ClaimView({ report, onBack, onDone, showToast }: { report: ItemReport; onBack: () => void; onDone: () => void; showToast: (message: string) => void }) {
+function ClaimView({ report, onBack, onDone, showToast, onSubmit }: { report: ItemReport; onBack: () => void; onDone: () => void; showToast: (message: string) => void; onSubmit: (privateDetail: string) => Promise<string> }) {
   const [done, setDone] = useState(false);
-  function submit(event: FormEvent) {
+  const [submitting, setSubmitting] = useState(false);
+  const [privateDetail, setPrivateDetail] = useState("");
+  const [claimReference, setClaimReference] = useState("");
+  async function submit(event: FormEvent) {
     event.preventDefault();
-    setDone(true);
-    showToast("Claim sent for private review");
+    setSubmitting(true);
+    try {
+      const reference = await onSubmit(privateDetail.trim());
+      setClaimReference(reference);
+      setDone(true);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "The claim could not be submitted. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   }
-  if (done) return <main className="mobile-page claim-success"><span><CheckCircle2 size={39} /></span><p className="micro-label">Claim received</p><h1>We will review the details privately.</h1><p>You will receive an alert before any finder or handover information is released.</p><div><small>Claim reference</small><strong>CF-UI-1942</strong></div><button type="button" className="primary-app-button" onClick={onDone}>View updates</button></main>;
-  return <main className="mobile-page claim-page"><CompactHeader title="Verify ownership" onBack={onBack} /><section className="claim-item"><div><ReportImage report={report} /></div><span><small>You are claiming</small><strong>{report.title}</strong><p><MapPin size={12} />{report.location}</p></span></section><form onSubmit={submit}><div className="claim-intro"><span><LockKeyhole size={20} /></span><div><h1>Tell us something only the owner would know.</h1><p>This answer is hidden from the public and compared during review.</p></div></div><label className="claim-question"><span>Private identifying detail</span><textarea rows={5} required placeholder="For example: a name inside, a unique scratch or something kept in the item…" /><small>Never enter a password, card PIN or bank information.</small></label><label className="claim-proof"><Camera size={20} /><span><b>Add supporting proof</b><small>Old photo or receipt · optional</small></span><Plus size={17} /><input type="file" accept="image/*,.pdf" /></label><label className="claim-check"><input type="checkbox" required /><span>I confirm that this item belongs to me and the information is truthful.</span></label><button className="primary-app-button" type="submit">Send for review <ArrowRight size={18} /></button></form></main>;
+  if (done) return <main className="mobile-page claim-success"><span><CheckCircle2 size={39} /></span><p className="micro-label">Claim received</p><h1>We will review the details privately.</h1><p>You will receive an alert before any finder or handover information is released.</p><div><small>{claimReference === "DEMO" ? "Mode" : "Claim reference"}</small><strong>{claimReference === "DEMO" ? "Demo only" : claimReference}</strong></div><button type="button" className="primary-app-button" onClick={onDone}>View updates</button></main>;
+  return <main className="mobile-page claim-page"><CompactHeader title="Verify ownership" onBack={onBack} /><section className="claim-item"><div><ReportImage report={report} /></div><span><small>You are claiming</small><strong>{report.title}</strong><p><MapPin size={12} />{report.location}</p></span></section><form onSubmit={submit}><div className="claim-intro"><span><LockKeyhole size={20} /></span><div><h1>Tell us something only the owner would know.</h1><p>This answer is sent privately for review and is never shown in the public report.</p></div></div><label className="claim-question"><span>Private identifying detail</span><textarea rows={5} value={privateDetail} onChange={(event) => setPrivateDetail(event.target.value)} minLength={10} maxLength={1500} required placeholder="For example: a name inside, a unique scratch or something kept in the item…" /><small>Never enter a password, card PIN or bank information. Supporting-file uploads are not connected yet.</small></label><label className="claim-check"><input type="checkbox" required /><span>I confirm that this item belongs to me and the information is truthful.</span></label><button className="primary-app-button" type="submit" disabled={submitting}>{submitting ? "Submitting…" : "Send for review"} <ArrowRight size={18} /></button></form></main>;
 }
-
 function AlertsView({ notifications, setNotifications, session, onMatch, onSignIn }: { notifications: NotificationItem[]; setNotifications: (update: (items: NotificationItem[]) => NotificationItem[]) => void; session: ApiSession | null; onMatch: () => void; onSignIn: () => void }) {
   useEffect(() => {
     if (!apiConfigured || !session || session.token === "campusfind-demo-session") return;
