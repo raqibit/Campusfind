@@ -91,25 +91,6 @@ router.patch(
   }),
 );
 
-router.patch(
-  "/handovers/:handoverId/confirm",
-  asyncRoute(async (request, response) => {
-    const input = z.object({ party: z.enum(["finder", "owner"]) }).parse(request.body);
-    const handover = await Handover.findById(request.params.handoverId);
-    if (!handover) throw new AppError(404, "Handover not found.", "HANDOVER_NOT_FOUND");
-    if (input.party === "finder") handover.finderConfirmedAt = new Date();
-    if (input.party === "owner") handover.ownerConfirmedAt = new Date();
-    if (handover.finderConfirmedAt && handover.ownerConfirmedAt) {
-      handover.completedAt = new Date();
-      const claim = await Claim.findById(handover.claim);
-      if (claim) {
-        const match = await Match.findById(claim.match);
-        if (match) await Report.updateMany({ _id: { $in: [match.lostReport, match.foundReport] } }, { status: "returned" });
-      }
-    }
-    await handover.save();
-    response.json({ data: handover });
-  }),
-);
+
 
 export default router;
