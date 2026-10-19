@@ -722,7 +722,7 @@ function SettingsList({ onReplay }: { onReplay: () => void }) {
 
 function AdminView({ onBack, session }: { onBack: () => void; session: ApiSession | null }) {
   const [claims, setClaims] = useState<import("@/lib/api").ApiAdminClaim[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [evidenceUrls, setEvidenceUrls] = useState<Record<string, string>>({});
   const sessionToken = session?.token;
