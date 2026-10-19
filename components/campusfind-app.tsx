@@ -696,7 +696,7 @@ function AlertsView({ notifications, setNotifications, session, onMatch, onSignI
   }
   async function markAllRead() {
     setNotifications((items) => items.map((item) => ({ ...item, read: true })));
-    if (apiConfigured && session.token !== "campusfind-demo-session") {
+    if (apiConfigured && session && session.token !== "campusfind-demo-session") {
       try { await markAllNotificationsRead(session.token); } catch { /* The next refresh will reconcile server state. */ }
     }
   }
