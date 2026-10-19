@@ -5,6 +5,7 @@ import { requireAuth } from "../middleware/auth.js";
 import { Claim } from "../models/claim.js";
 import { Match } from "../models/match.js";
 import { Report } from "../models/report.js";
+import { verifyUserObjects } from "../services/object-storage.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -13,12 +14,14 @@ const claimSchema = z.object({
   matchId: z.string().min(1),
   privateDetail: z.string().trim().min(10).max(1500),
   proofUrls: z.array(z.string().url()).max(5).default([]),
+  proofKeys: z.array(z.string().min(1)).max(5).default([]),
 });
 
 router.post(
   "/",
   asyncRoute(async (request, response) => {
     const input = claimSchema.parse(request.body);
+    await verifyUserObjects(input.proofKeys, "claim-evidence", request.auth!.universityId, request.auth!.userId);
     const match = await Match.findOne({ _id: input.matchId, university: request.auth!.universityId }).lean();
     if (!match) throw new AppError(404, "Match not found.", "MATCH_NOT_FOUND");
     if (match.status === "approved" || match.status === "rejected") {
@@ -34,6 +37,7 @@ router.post(
       claimant: request.auth!.userId,
       privateDetail: input.privateDetail,
       proofUrls: input.proofUrls,
+      proofKeys: input.proofKeys,
     });
     await Promise.all([
       Match.findByIdAndUpdate(match._id, { status: "reviewing" }),
