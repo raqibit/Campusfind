@@ -126,6 +126,46 @@ export async function publishReport(
 }
 
 
+
+export interface ApiMatchReport {
+  _id: string;
+  title: string;
+  category: ItemCategory;
+  publicDescription: string;
+  location: { label: string };
+  happenedAt: string;
+  imageUrls?: string[];
+  reporter?: { _id?: string; fullName?: string };
+  status?: ApiReport["status"];
+}
+
+export interface ApiMatch {
+  _id: string;
+  score: number;
+  factors: { image: number; text: number; attributes: number; location: number; date: number };
+  status: "suggested" | "reviewing" | "approved" | "rejected";
+  lostReport: ApiMatchReport;
+  foundReport: ApiMatchReport;
+}
+
+export async function listMyMatches(token: string) {
+  const response = await request<{ data: ApiMatch[] }>("/matches/my", {}, token);
+  return response.data;
+}
+
+export async function createClaim(token: string, input: {
+  matchId: string;
+  privateDetail: string;
+  proofUrls?: string[];
+}) {
+  const response = await request<{ data: { id: string; status: "pending" | "approved" | "rejected" | "more_evidence"; createdAt: string } }>(
+    "/claims",
+    { method: "POST", body: JSON.stringify(input) },
+    token,
+  );
+  return response.data;
+}
+
 export interface ApiNotification {
   _id: string;
   kind: "match" | "claim" | "handover" | "system";
