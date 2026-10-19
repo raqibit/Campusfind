@@ -40,6 +40,7 @@ import {
   listReports,
   listMyMatches,
   createClaim,
+  uploadFile,
   listNotifications,
   markNotificationRead,
   markAllNotificationsRead,
@@ -246,7 +247,7 @@ export default function CampusFindApp() {
     navigate("detail");
   }
 
-  async function addReport(report: ItemReport, happenedAt: string) {
+  async function addReport(report: ItemReport, happenedAt: string, imageFile?: File) {
     let savedReport = report;
     let message = "Demo report published locally";
     if (apiConfigured) {
@@ -255,10 +256,11 @@ export default function CampusFindApp() {
         return;
       }
       try {
+        const imageKeys = imageFile ? [await uploadFile(session.token, imageFile, "report-image")] : [];
         const result = await publishReport(session.token, {
           type: report.type, title: report.title, category: report.category,
           publicDescription: report.description, location: { label: report.location },
-          happenedAt, imageUrls: [],
+          happenedAt, imageUrls: [], imageKeys,
         });
         savedReport = mapApiReport(result.data);
         message = result.meta.matchesCreated
@@ -282,7 +284,7 @@ export default function CampusFindApp() {
     navigate("detail");
   }
 
-  async function submitClaim(privateDetail: string) {
+  async function submitClaim(privateDetail: string, proofFile?: File) {
     if (!apiConfigured) {
       showToast("Demo claim submitted for simulated review.");
       return "DEMO";
@@ -293,7 +295,8 @@ export default function CampusFindApp() {
     const matches = await listMyMatches(session.token);
     const match = matches.find((candidate) => candidate.foundReport?._id === claimTarget.id && candidate.status !== "approved" && candidate.status !== "rejected");
     if (!match) throw new Error("No active match links this found item to one of your lost reports. Check your matches before submitting a claim.");
-    const claim = await createClaim(session.token, { matchId: match._id, privateDetail });
+    const proofKeys = proofFile ? [await uploadFile(session.token, proofFile, "claim-evidence")] : [];
+    const claim = await createClaim(session.token, { matchId: match._id, privateDetail, proofKeys });
     showToast("Claim submitted for private review.");
     return claim.id;
   }
@@ -604,9 +607,10 @@ function MatchView({ lost, found, match, onBack, onClaim }: { lost: ItemReport; 
   );
 }
 
-function CreateView({ initialType, onBack, onPublish }: { initialType: ReportType; onBack: () => void; onPublish: (report: ItemReport, happenedAt: string) => Promise<void> }) {
+function CreateView({ initialType, onBack, onPublish }: { initialType: ReportType; onBack: () => void; onPublish: (report: ItemReport, happenedAt: string, imageFile?: File) => Promise<void> }) {
   const [step, setStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
+  const [imageFile, setImageFile] = useState<File | undefined>();
   const [draft, setDraft] = useState({ type: initialType, title: "", category: "" as ItemCategory | "", description: "", location: "", date: "" });
 
   function next() {
@@ -629,7 +633,7 @@ function CreateView({ initialType, onBack, onPublish }: { initialType: ReportTyp
       accent: draft.type === "found" ? "#e6f7ee" : "#eaf0ff",
       initials: draft.title.split(" ").slice(0, 2).map((word) => word[0]).join("").toUpperCase(),
     };
-    await onPublish(report, new Date(draft.date).toISOString());
+    await onPublish(report, new Date(draft.date).toISOString(), imageFile);
     setSubmitting(false);
   }
 
@@ -640,23 +644,24 @@ function CreateView({ initialType, onBack, onPublish }: { initialType: ReportTyp
       <form onSubmit={submit}>
         {step === 1 && <section className="create-step"><p className="micro-label">Let us start</p><h1>What happened?</h1><p className="step-copy">Choose the report type. You can still change it before publishing.</p><div className="report-choice"><button type="button" className={draft.type === "lost" ? "active" : ""} onClick={() => setDraft({ ...draft, type: "lost" })}><span><PackageOpen size={25} /></span><b>I lost an item</b><small>Help me find it</small><CheckCircle2 size={18} /></button><button type="button" className={draft.type === "found" ? "active found" : ""} onClick={() => setDraft({ ...draft, type: "found" })}><span><PackageCheck size={25} /></span><b>I found an item</b><small>Help return it</small><CheckCircle2 size={18} /></button></div></section>}
         {step === 2 && <section className="create-step"><p className="micro-label">Useful clues</p><h1>Describe the item.</h1><p className="step-copy">Clear public details give the matching system better evidence.</p><div className="mobile-form"><label><span>Item name</span><input value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} placeholder="Black leather wallet" required /></label><label><span>Category</span><select value={draft.category} onChange={(event) => setDraft({ ...draft, category: event.target.value as ItemCategory })} required><option value="">Choose category</option>{categories.filter((item) => item.label !== "All").map((item) => <option key={item.label}>{item.label}</option>)}</select></label><label><span>{draft.type === "lost" ? "Last seen" : "Found at"}</span><div className="input-icon"><MapPin size={17} /><input value={draft.location} onChange={(event) => setDraft({ ...draft, location: event.target.value })} placeholder="Kenneth Dike Library" required /></div></label><label><span>Date</span><input type="date" value={draft.date} onChange={(event) => setDraft({ ...draft, date: event.target.value })} required /></label><label><span>Public description</span><textarea value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} rows={4} placeholder="Colour, size, brand and visible features…" required /></label></div></section>}
-        {step === 3 && <section className="create-step"><p className="micro-label">Final touch</p><h1>Add a clear photo.</h1><p className="step-copy">A useful photo can improve a visual match. Keep identity numbers out of view.</p><div className="mobile-upload" aria-label="Photo upload unavailable"><span><ImagePlus size={25} /></span><b>Photo upload is not connected yet</b><small>You can publish this report without a photo.</small></div><div className="publish-summary"><span className={`report-kind ${draft.type}`}>{draft.type}</span><h3>{draft.title}</h3><p><MapPin size={13} />{draft.location}</p><small>{draft.category} · {draft.date}</small></div><div className="privacy-line"><ShieldCheck size={18} /><p>Your name and contact details will not appear in the public report.</p></div></section>}
+        {step === 3 && <section className="create-step"><p className="micro-label">Final touch</p><h1>Add a clear photo.</h1><p className="step-copy">A useful photo can improve a visual match. Keep identity numbers out of view.</p><label className="mobile-upload"><input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => setImageFile(event.target.files?.[0] || undefined)} /><span><ImagePlus size={25} /></span><b>{imageFile?.name || "Choose a photo from your phone"}</b><small>{imageFile ? "Photo selected · uploads securely when published" : "JPG, PNG or WEBP · up to 8 MB · optional"}</small></label><div className="publish-summary"><span className={`report-kind ${draft.type}`}>{draft.type}</span><h3>{draft.title}</h3><p><MapPin size={13} />{draft.location}</p><small>{draft.category} · {draft.date}</small></div><div className="privacy-line"><ShieldCheck size={18} /><p>Your name and contact details will not appear in the public report.</p></div></section>}
         <div className="create-footer">{step < 3 ? <button type="button" className="primary-app-button" onClick={next}>Continue <ArrowRight size={18} /></button> : <button type="submit" className="primary-app-button" disabled={submitting}>{submitting ? "Publishing…" : "Publish report"}<ArrowRight size={18} /></button>}</div>
       </form>
     </main>
   );
 }
 
-function ClaimView({ report, onBack, onDone, showToast, onSubmit }: { report: ItemReport; onBack: () => void; onDone: () => void; showToast: (message: string) => void; onSubmit: (privateDetail: string) => Promise<string> }) {
+function ClaimView({ report, onBack, onDone, showToast, onSubmit }: { report: ItemReport; onBack: () => void; onDone: () => void; showToast: (message: string) => void; onSubmit: (privateDetail: string, proofFile?: File) => Promise<string> }) {
   const [done, setDone] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [privateDetail, setPrivateDetail] = useState("");
+  const [proofFile, setProofFile] = useState<File | undefined>();
   const [claimReference, setClaimReference] = useState("");
   async function submit(event: FormEvent) {
     event.preventDefault();
     setSubmitting(true);
     try {
-      const reference = await onSubmit(privateDetail.trim());
+      const reference = await onSubmit(privateDetail.trim(), proofFile);
       setClaimReference(reference);
       setDone(true);
     } catch (error) {
@@ -666,7 +671,7 @@ function ClaimView({ report, onBack, onDone, showToast, onSubmit }: { report: It
     }
   }
   if (done) return <main className="mobile-page claim-success"><span><CheckCircle2 size={39} /></span><p className="micro-label">Claim received</p><h1>We will review the details privately.</h1><p>You will receive an alert before any finder or handover information is released.</p><div><small>{claimReference === "DEMO" ? "Mode" : "Claim reference"}</small><strong>{claimReference === "DEMO" ? "Demo only" : claimReference}</strong></div><button type="button" className="primary-app-button" onClick={onDone}>View updates</button></main>;
-  return <main className="mobile-page claim-page"><CompactHeader title="Verify ownership" onBack={onBack} /><section className="claim-item"><div><ReportImage report={report} /></div><span><small>You are claiming</small><strong>{report.title}</strong><p><MapPin size={12} />{report.location}</p></span></section><form onSubmit={submit}><div className="claim-intro"><span><LockKeyhole size={20} /></span><div><h1>Tell us something only the owner would know.</h1><p>This answer is sent privately for review and is never shown in the public report.</p></div></div><label className="claim-question"><span>Private identifying detail</span><textarea rows={5} value={privateDetail} onChange={(event) => setPrivateDetail(event.target.value)} minLength={10} maxLength={1500} required placeholder="For example: a name inside, a unique scratch or something kept in the item…" /><small>Never enter a password, card PIN or bank information. Supporting-file uploads are not connected yet.</small></label><label className="claim-check"><input type="checkbox" required /><span>I confirm that this item belongs to me and the information is truthful.</span></label><button className="primary-app-button" type="submit" disabled={submitting}>{submitting ? "Submitting…" : "Send for review"} <ArrowRight size={18} /></button></form></main>;
+  return <main className="mobile-page claim-page"><CompactHeader title="Verify ownership" onBack={onBack} /><section className="claim-item"><div><ReportImage report={report} /></div><span><small>You are claiming</small><strong>{report.title}</strong><p><MapPin size={12} />{report.location}</p></span></section><form onSubmit={submit}><div className="claim-intro"><span><LockKeyhole size={20} /></span><div><h1>Tell us something only the owner would know.</h1><p>This answer is sent privately for review and is never shown in the public report.</p></div></div><label className="claim-question"><span>Private identifying detail</span><textarea rows={5} value={privateDetail} onChange={(event) => setPrivateDetail(event.target.value)} minLength={10} maxLength={1500} required placeholder="For example: a name inside, a unique scratch or something kept in the item…" /><small>Never enter a password, card PIN or bank information.</small></label><label className="claim-proof"><Camera size={20} /><span><b>{proofFile?.name || "Add supporting proof"}</b><small>Old photo or receipt · optional</small></span><Plus size={17} /><input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" onChange={(event) => setProofFile(event.target.files?.[0] || undefined)} /></label><label className="claim-check"><input type="checkbox" required /><span>I confirm that this item belongs to me and the information is truthful.</span></label><button className="primary-app-button" type="submit" disabled={submitting}>{submitting ? "Submitting…" : "Send for review"} <ArrowRight size={18} /></button></form></main>;
 }
 function AlertsView({ notifications, setNotifications, session, onMatch, onSignIn }: { notifications: NotificationItem[]; setNotifications: (update: (items: NotificationItem[]) => NotificationItem[]) => void; session: ApiSession | null; onMatch: () => void; onSignIn: () => void }) {
   const sessionToken = session?.token;
