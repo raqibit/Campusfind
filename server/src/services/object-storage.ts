@@ -74,9 +74,9 @@ function presign(method: "GET" | "PUT" | "HEAD", key: string, contentType?: stri
     "X-Amz-SignedHeaders": signedHeaders,
   });
   if (env.S3_SESSION_TOKEN) params.set("X-Amz-Security-Token", env.S3_SESSION_TOKEN);
-  const canonicalHeaders = contentType ? `content-type:${contentType.trim()}\\nhost:${url.host}\\n` : `host:${url.host}\\n`;
-  const canonicalRequest = [method, url.pathname, canonicalQuery(params), canonicalHeaders, signedHeaders, "UNSIGNED-PAYLOAD"].join("\\n");
-  const stringToSign = ["AWS4-HMAC-SHA256", date, scope, sha256(canonicalRequest)].join("\\n");
+  const canonicalHeaders = contentType ? `content-type:${contentType.trim()}\nhost:${url.host}\n` : `host:${url.host}\n`;
+  const canonicalRequest = [method, url.pathname, canonicalQuery(params), canonicalHeaders, signedHeaders, "UNSIGNED-PAYLOAD"].join("\n");
+  const stringToSign = ["AWS4-HMAC-SHA256", date, scope, sha256(canonicalRequest)].join("\n");
   const signature = hmacHex(signingKey(secretAccessKey, shortDate, env.S3_REGION), stringToSign);
   params.set("X-Amz-Signature", signature);
   url.search = canonicalQuery(params);
