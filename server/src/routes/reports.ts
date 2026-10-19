@@ -3,6 +3,7 @@ import { z } from "zod";
 import { asyncRoute, AppError } from "../lib/errors.js";
 import { requireAuth } from "../middleware/auth.js";
 import { Report } from "../models/report.js";
+import { University } from "../models/university.js";
 import { createImageEmbedding } from "../services/image-embedding.js";
 import { createMatchSuggestions } from "../services/matching.js";
 
@@ -44,8 +45,10 @@ router.get(
       limit: z.coerce.number().int().min(1).max(50).default(18),
     });
     const query = querySchema.parse(request.query);
+    const university = await University.findOne({ _id: query.universityId, shortName: "UI", active: true }).select("_id").lean();
+    if (!university) throw new AppError(404, "CampusFind is currently available only within the University of Ibadan.", "UNIVERSITY_OUT_OF_SCOPE");
     const filter: Record<string, unknown> = {
-      university: query.universityId,
+      university: university._id,
       status: { $in: ["open", "matched", "claimed", "returned"] },
     };
     if (query.type) filter.type = query.type;
@@ -94,7 +97,10 @@ router.post(
 router.get(
   "/:reportId",
   asyncRoute(async (request, response) => {
-    const report = await Report.findById(request.params.reportId)
+    const query = z.object({ universityId: z.string().min(1) }).parse(request.query);
+    const university = await University.findOne({ _id: query.universityId, shortName: "UI", active: true }).select("_id").lean();
+    if (!university) throw new AppError(404, "CampusFind is currently available only within the University of Ibadan.", "UNIVERSITY_OUT_OF_SCOPE");
+    const report = await Report.findOne({ _id: request.params.reportId, university: university._id })
       .select("-privateDetails -imageEmbedding")
       .populate("reporter", "fullName verified")
       .lean();
@@ -108,7 +114,7 @@ router.patch(
   requireAuth,
   asyncRoute(async (request, response) => {
     const input = reportSchema.partial().omit({ type: true, imageEmbedding: true }).parse(request.body);
-    const report = await Report.findById(request.params.reportId);
+    const report = await Report.findOne({ _id: request.params.reportId, university: request.auth!.universityId });
     if (!report) throw new AppError(404, "Report not found.", "REPORT_NOT_FOUND");
     if (report.reporter.toString() !== request.auth!.userId && request.auth!.role !== "admin") {
       throw new AppError(403, "You cannot edit this report.", "FORBIDDEN");
@@ -124,7 +130,7 @@ router.post(
   requireAuth,
   asyncRoute(async (request, response) => {
     const reportId = String(request.params.reportId);
-    const report = await Report.findById(reportId).lean();
+    const report = await Report.findOne({ _id: reportId, university: request.auth!.universityId }).lean();
     if (!report) throw new AppError(404, "Report not found.", "REPORT_NOT_FOUND");
     if (report.reporter.toString() !== request.auth!.userId && request.auth!.role !== "admin") {
       throw new AppError(403, "You cannot rematch this report.", "FORBIDDEN");

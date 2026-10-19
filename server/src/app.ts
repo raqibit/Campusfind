@@ -9,6 +9,7 @@ import adminRoutes from "./routes/admin.js";
 import authRoutes from "./routes/auth.js";
 import claimRoutes from "./routes/claims.js";
 import matchRoutes from "./routes/matches.js";
+import handoverRoutes from "./routes/handovers.js";
 import notificationRoutes from "./routes/notifications.js";
 import reportRoutes from "./routes/reports.js";
 
@@ -46,6 +47,7 @@ export function createApp() {
   app.use("/api/matches", matchRoutes);
   app.use("/api/claims", claimRoutes);
   app.use("/api/notifications", notificationRoutes);
+  app.use("/api/handovers", handoverRoutes);
   app.use("/api/admin", adminRoutes);
   app.use(notFound);
   app.use(errorHandler);

@@ -19,9 +19,12 @@ router.post(
   "/",
   asyncRoute(async (request, response) => {
     const input = claimSchema.parse(request.body);
-    const match = await Match.findById(input.matchId).lean();
+    const match = await Match.findOne({ _id: input.matchId, university: request.auth!.universityId }).lean();
     if (!match) throw new AppError(404, "Match not found.", "MATCH_NOT_FOUND");
-    const lostReport = await Report.findById(match.lostReport).select("reporter").lean();
+    if (match.status === "approved" || match.status === "rejected") {
+      throw new AppError(409, "This match is no longer accepting claims.", "MATCH_CLOSED");
+    }
+    const lostReport = await Report.findOne({ _id: match.lostReport, university: request.auth!.universityId }).select("reporter").lean();
     if (!lostReport || lostReport.reporter.toString() !== request.auth!.userId) {
       throw new AppError(403, "Only the owner of the lost report can claim this item.", "FORBIDDEN");
     }

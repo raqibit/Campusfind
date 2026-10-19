@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
-  Apple,
   ArrowLeft,
   ArrowRight,
   BadgeCheck,
@@ -40,6 +39,9 @@ import {
 import {
   apiConfigured,
   listReports,
+  listNotifications,
+  markNotificationRead,
+  markAllNotificationsRead,
   listUniversities,
   login,
   publishReport,
@@ -313,7 +315,7 @@ export default function CampusFindApp() {
           {screen === "create" && <CreateView initialType={reportType} onBack={() => navigate("home")} onPublish={addReport} />}
           {screen === "claim" && <ClaimView report={foundReport || selectedReport} onBack={() => navigate("match")} onDone={() => navigate("notifications")} showToast={showToast} />}
           {screen === "notifications" && (
-            <AlertsView notifications={notifications} session={session} onMatch={() => navigate("match")} onSignIn={() => {
+            <AlertsView notifications={notifications} setNotifications={setNotifications} session={session} onMatch={() => navigate("match")} onSignIn={() => {
               setProtectedDestination("notifications");
               setAuthReason("account");
             }} />
@@ -618,9 +620,38 @@ function ClaimView({ report, onBack, onDone, showToast }: { report: ItemReport; 
   return <main className="mobile-page claim-page"><CompactHeader title="Verify ownership" onBack={onBack} /><section className="claim-item"><div><ReportImage report={report} /></div><span><small>You are claiming</small><strong>{report.title}</strong><p><MapPin size={12} />{report.location}</p></span></section><form onSubmit={submit}><div className="claim-intro"><span><LockKeyhole size={20} /></span><div><h1>Tell us something only the owner would know.</h1><p>This answer is hidden from the public and compared during review.</p></div></div><label className="claim-question"><span>Private identifying detail</span><textarea rows={5} required placeholder="For example: a name inside, a unique scratch or something kept in the item…" /><small>Never enter a password, card PIN or bank information.</small></label><label className="claim-proof"><Camera size={20} /><span><b>Add supporting proof</b><small>Old photo or receipt · optional</small></span><Plus size={17} /><input type="file" accept="image/*,.pdf" /></label><label className="claim-check"><input type="checkbox" required /><span>I confirm that this item belongs to me and the information is truthful.</span></label><button className="primary-app-button" type="submit">Send for review <ArrowRight size={18} /></button></form></main>;
 }
 
-function AlertsView({ notifications, session, onMatch, onSignIn }: { notifications: NotificationItem[]; session: ApiSession | null; onMatch: () => void; onSignIn: () => void }) {
+function AlertsView({ notifications, setNotifications, session, onMatch, onSignIn }: { notifications: NotificationItem[]; setNotifications: (update: (items: NotificationItem[]) => NotificationItem[]) => void; session: ApiSession | null; onMatch: () => void; onSignIn: () => void }) {
+  useEffect(() => {
+    if (!apiConfigured || !session || session.token === "campusfind-demo-session") return;
+    let active = true;
+    void listNotifications(session.token).then((items) => {
+      if (!active) return;
+      setNotifications(() => items.map((item) => ({
+        id: item._id,
+        title: item.title,
+        message: item.message,
+        time: new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(item.createdAt)),
+        kind: item.kind === "match" || item.kind === "claim" ? item.kind : "system",
+        read: Boolean(item.readAt),
+      })));
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, [session?.token]);
   if (!session) return <main className="mobile-page alerts-page"><SimpleTitle title="Alerts" /><div className="guest-state"><span><Bell size={26} /></span><h1>Matches should find you.</h1><p>Sign in to receive possible-match, claim-review and handover alerts.</p><button type="button" className="primary-app-button" onClick={onSignIn}>Sign in for alerts</button><small>You can continue browsing without an account.</small></div></main>;
-  return <main className="mobile-page alerts-page"><SimpleTitle title="Alerts" /><div className="today-label">Today</div><div className="alert-list">{notifications.map((item) => <button type="button" key={item.id} className={!item.read ? "alert-card unread" : "alert-card"} onClick={() => item.kind === "match" && onMatch()}><span className={`alert-icon ${item.kind}`}>{item.kind === "match" ? <Sparkles size={19} /> : item.kind === "claim" ? <ShieldCheck size={19} /> : <Bell size={19} />}</span><span><strong>{item.title}</strong><p>{item.message}</p><small>{item.time}</small></span>{item.kind === "match" && <ChevronRight size={17} />}</button>)}</div></main>;
+  async function openNotification(item: NotificationItem) {
+    setNotifications((items) => items.map((notice) => notice.id === item.id ? { ...notice, read: true } : notice));
+    if (apiConfigured && session.token !== "campusfind-demo-session" && item.id.length > 20) {
+      try { await markNotificationRead(session.token, item.id); } catch { /* Keep the local read state; refresh can reconcile it. */ }
+    }
+    if (item.kind === "match") onMatch();
+  }
+  async function markAllRead() {
+    setNotifications((items) => items.map((item) => ({ ...item, read: true })));
+    if (apiConfigured && session.token !== "campusfind-demo-session") {
+      try { await markAllNotificationsRead(session.token); } catch { /* The next refresh will reconcile server state. */ }
+    }
+  }
+  return <main className="mobile-page alerts-page"><SimpleTitle title="Alerts" /><div className="today-label">Your updates <button type="button" onClick={markAllRead}>Mark all read</button></div><div className="alert-list">{notifications.map((item) => <button type="button" key={item.id} className={!item.read ? "alert-card unread" : "alert-card"} onClick={() => void openNotification(item)}><span className={`alert-icon ${item.kind}`}>{item.kind === "match" ? <Sparkles size={19} /> : item.kind === "claim" ? <ShieldCheck size={19} /> : <Bell size={19} />}</span><span><strong>{item.title}</strong><p>{item.message}</p><small>{item.time}</small></span>{item.kind === "match" && <ChevronRight size={17} />}</button>)}</div></main>;
 }
 
 function ProfileView({ session, onSignIn, onSignOut, onReplay, onAdmin }: { session: ApiSession | null; onSignIn: () => void; onSignOut: () => void; onReplay: () => void; onAdmin: () => void }) {
@@ -665,14 +696,6 @@ function AuthSheet({ reason, onClose, onAuthenticated }: { reason: AuthReason; o
 
   const reasonCopy = reason === "post" ? "Create an account to publish a trusted campus report." : reason === "claim" ? "Create an account so your ownership claim can be reviewed securely." : "Sign in to keep your reports and alerts in one place.";
 
-  async function apple() {
-    setLoading(true);
-    setError("");
-    await new Promise((resolve) => window.setTimeout(resolve, 650));
-    await onAuthenticated(demoSession());
-    setLoading(false);
-  }
-
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
@@ -697,5 +720,5 @@ function AuthSheet({ reason, onClose, onAuthenticated }: { reason: AuthReason; o
     }
   }
 
-  return <div className="sheet-layer" role="dialog" aria-modal="true" aria-label="Sign in to CampusFind"><button type="button" className="sheet-scrim" aria-label="Close sign in" onClick={onClose} /><section className="auth-sheet"><span className="sheet-handle" /><div className="sheet-heading"><div><Mark compact /><span><small>CampusFind</small><b>{mode === "options" ? "Join to continue" : mode === "signin" ? "Welcome back" : "Create your account"}</b></span></div><button type="button" onClick={onClose}><X size={19} /></button></div>{mode === "options" && <><p className="auth-reason">{reasonCopy}</p><button type="button" className="apple-button" onClick={apple} disabled={loading}><Apple size={19} fill="currentColor" />{loading ? "Connecting…" : "Continue with Apple"}</button><button type="button" className="email-button" onClick={() => setMode("signup")}><Mail size={18} />Continue with email</button><div className="auth-divider"><span />or<span /></div><button type="button" className="existing-link" onClick={() => setMode("signin")}>Already have an account? <b>Sign in</b></button><p className="guest-note"><ShieldCheck size={15} />You may browse CampusFind without an account.</p></>}{mode !== "options" && <form className="auth-form" onSubmit={submit}>{mode === "signup" && <><label><span>Full name</span><input name="fullName" required placeholder="Demo Student" /></label><label><span>Matric number</span><input name="matricNumber" required placeholder="UI-DEMO-001" /></label>{apiConfigured && <label><span>University</span><select name="universityId" required defaultValue=""><option value="" disabled>Choose your university</option>{universities.map((university) => <option key={university._id} value={university._id}>{university.name}</option>)}</select></label>}</>}<label><span>School email</span><input name="email" type="email" required placeholder="demo.student@example.edu" /></label><label><span>Password</span><input name="password" type="password" minLength={8} required placeholder="At least 8 characters" /></label>{error && <p className="auth-error">{error}</p>}<button type="submit" className="primary-app-button" disabled={loading}>{loading ? "Please wait…" : mode === "signin" ? "Sign in" : "Create account"}<ArrowRight size={17} /></button><button type="button" className="back-to-options" onClick={() => { setMode("options"); setError(""); }}><ArrowLeft size={15} />Other sign-in options</button>{mode === "signup" && <p className="auth-terms">By continuing, you agree to the CampusFind safety and privacy rules.</p>}</form>}</section></div>;
+  return <div className="sheet-layer" role="dialog" aria-modal="true" aria-label="Sign in to CampusFind"><button type="button" className="sheet-scrim" aria-label="Close sign in" onClick={onClose} /><section className="auth-sheet"><span className="sheet-handle" /><div className="sheet-heading"><div><Mark compact /><span><small>CampusFind</small><b>{mode === "options" ? "Join to continue" : mode === "signin" ? "Welcome back" : "Create your account"}</b></span></div><button type="button" onClick={onClose}><X size={19} /></button></div>{mode === "options" && <><p className="auth-reason">{reasonCopy}</p><button type="button" className="email-button" onClick={() => setMode("signup")}><Mail size={18} />Continue with email</button><button type="button" className="existing-link" onClick={() => setMode("signin")}>Already have an account? <b>Sign in</b></button><p className="guest-note"><ShieldCheck size={15} />You may browse CampusFind without an account.</p></>}{mode !== "options" && <form className="auth-form" onSubmit={submit}>{mode === "signup" && <><label><span>Full name</span><input name="fullName" required placeholder="Demo Student" /></label><label><span>Matric number</span><input name="matricNumber" required placeholder="UI-DEMO-001" /></label>{apiConfigured && <label><span>University</span><select name="universityId" required defaultValue=""><option value="" disabled>Choose your university</option>{universities.map((university) => <option key={university._id} value={university._id}>{university.name}</option>)}</select></label>}</>}<label><span>School email</span><input name="email" type="email" required placeholder="demo.student@example.edu" /></label><label><span>Password</span><input name="password" type="password" minLength={8} required placeholder="At least 8 characters" /></label>{error && <p className="auth-error">{error}</p>}<button type="submit" className="primary-app-button" disabled={loading}>{loading ? "Please wait…" : mode === "signin" ? "Sign in" : "Create account"}<ArrowRight size={17} /></button><button type="button" className="back-to-options" onClick={() => { setMode("options"); setError(""); }}><ArrowLeft size={15} />Other sign-in options</button>{mode === "signup" && <p className="auth-terms">By continuing, you agree to the CampusFind safety and privacy rules.</p>}</form>}</section></div>;
 }
