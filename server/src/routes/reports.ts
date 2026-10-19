@@ -5,6 +5,8 @@ import { requireAuth } from "../middleware/auth.js";
 import { Report } from "../models/report.js";
 import { University } from "../models/university.js";
 import { createImageEmbedding } from "../services/image-embedding.js";
+import { attachReportImageUrls } from "../services/report-images.js";
+import { createDownloadUrl, verifyUserObjects } from "../services/object-storage.js";
 import { createMatchSuggestions } from "../services/matching.js";
 
 const router = Router();
@@ -30,6 +32,7 @@ const reportSchema = z.object({
   }),
   happenedAt: z.coerce.date(),
   imageUrls: z.array(z.string().url()).max(5).default([]),
+  imageKeys: z.array(z.string().min(1)).max(5).default([]),
   imageEmbedding: z.array(z.number().finite()).max(4096).optional(),
 });
 
@@ -65,7 +68,7 @@ router.get(
         .lean(),
       Report.countDocuments(filter),
     ]);
-    response.json({ data: items, meta: { page: query.page, limit: query.limit, total } });
+    response.json({ data: await Promise.all(items.map(attachReportImageUrls)), meta: { page: query.page, limit: query.limit, total } });
   }),
 );
 
@@ -74,10 +77,12 @@ router.post(
   requireAuth,
   asyncRoute(async (request, response) => {
     const input = reportSchema.parse(request.body);
+    await verifyUserObjects(input.imageKeys, "report-images", request.auth!.universityId, request.auth!.userId);
     let imageEmbedding = input.imageEmbedding;
-    if (!imageEmbedding && input.imageUrls[0]) {
+    const imageForEmbedding = input.imageUrls[0] ?? (input.imageKeys[0] ? await createDownloadUrl(input.imageKeys[0]) : undefined);
+    if (!imageEmbedding && imageForEmbedding) {
       try {
-        imageEmbedding = await createImageEmbedding(input.imageUrls[0]);
+        imageEmbedding = await createImageEmbedding(imageForEmbedding);
       } catch (error) {
         console.warn("Image embedding was skipped; metadata matching will continue.", error);
       }
@@ -90,7 +95,7 @@ router.post(
     });
     const matches = await createMatchSuggestions(report.id);
     const safeReport = await Report.findById(report.id).select("-privateDetails -imageEmbedding").lean();
-    response.status(201).json({ data: safeReport, meta: { matchesCreated: matches.length } });
+    response.status(201).json({ data: await attachReportImageUrls({ ...safeReport, imageKeys: input.imageKeys }), meta: { matchesCreated: matches.length } });
   }),
 );
 
@@ -105,7 +110,7 @@ router.get(
       .populate("reporter", "fullName verified")
       .lean();
     if (!report) throw new AppError(404, "Report not found.", "REPORT_NOT_FOUND");
-    response.json({ data: report });
+    response.json({ data: await attachReportImageUrls(report) });
   }),
 );
 
@@ -113,7 +118,7 @@ router.patch(
   "/:reportId",
   requireAuth,
   asyncRoute(async (request, response) => {
-    const input = reportSchema.partial().omit({ type: true, imageEmbedding: true }).parse(request.body);
+    const input = reportSchema.partial().omit({ type: true, imageEmbedding: true, imageKeys: true }).parse(request.body);
     const report = await Report.findOne({ _id: request.params.reportId, university: request.auth!.universityId });
     if (!report) throw new AppError(404, "Report not found.", "REPORT_NOT_FOUND");
     if (report.reporter.toString() !== request.auth!.userId && request.auth!.role !== "admin") {
