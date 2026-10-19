@@ -20,6 +20,8 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
+      - name: Check live storage smoke-test syntax
+        run: node --check scripts/minio-storage-smoke-test.mjs
       - name: Lint
         run: npm run lint
       - name: Build API
