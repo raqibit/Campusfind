@@ -52,6 +52,7 @@ import {
   removeSession,
   saveSession,
   type ApiReport,
+  type ApiMatch,
   type ApiSession,
   type ApiUniversity,
 } from "@/lib/api";
@@ -159,6 +160,7 @@ export default function CampusFindApp() {
   const [screen, setScreen] = useState<Screen>("home");
   const [session, setSession] = useState<ApiSession | null>(null);
   const [reports, setReports] = useState(seedReports);
+  const [matches, setMatches] = useState<ApiMatch[]>([]);
   const [notifications, setNotifications] = useState(seedNotifications);
   const [selectedReport, setSelectedReport] = useState(seedReports[2]);
   const [claimTarget, setClaimTarget] = useState<ItemReport>(seedReports[1]);
@@ -176,9 +178,26 @@ export default function CampusFindApp() {
     return () => window.clearTimeout(timer);
   }, []);
 
+  useEffect(() => {
+    if (!apiConfigured || !session || session.token === "campusfind-demo-session") return;
+    let active = true;
+    void listReports(session.user.university.id).then((items) => {
+      if (active) setReports(items.map(mapApiReport));
+    }).catch(() => {
+      if (active) showToast("Reports could not be refreshed. Check your connection and try again.");
+    });
+    void listMyMatches(session.token).then((items) => {
+      if (active) setMatches(items);
+    }).catch(() => {
+      if (active) setMatches([]);
+    });
+    return () => { active = false; };
+  }, [session?.token, session?.user.university.id]);
+
   const unread = notifications.filter((item) => !item.read).length;
-  const lostReport = reports.find((item) => item.id === featuredMatch.lostReportId) || reports[0];
-  const foundReport = reports.find((item) => item.id === featuredMatch.foundReportId) || reports[1];
+  const primaryMatch = matches[0];
+  const lostReport = primaryMatch ? mapApiReport(primaryMatch.lostReport) : reports.find((item) => item.id === featuredMatch.lostReportId) || reports[0];
+  const foundReport = primaryMatch ? mapApiReport(primaryMatch.foundReport) : reports.find((item) => item.id === featuredMatch.foundReportId) || reports[1];
 
   function showToast(message: string) {
     setToast(message);
@@ -208,14 +227,6 @@ export default function CampusFindApp() {
     saveSession(nextSession);
     setSession(nextSession);
     setAuthReason(null);
-    if (apiConfigured && nextSession.token !== "campusfind-demo-session") {
-      try {
-        const remote = await listReports(nextSession.user.university.id);
-        if (remote.length) setReports(remote.map(mapApiReport));
-      } catch {
-        showToast("Signed in. Reports will sync when the service is available.");
-      }
-    }
     navigate(protectedDestination);
     showToast(`Welcome, ${nextSession.user.fullName.split(" ")[0]}`);
   }
@@ -328,7 +339,7 @@ export default function CampusFindApp() {
             />
           )}
           {screen === "match" && lostReport && foundReport && (
-            <MatchView lost={lostReport} found={foundReport} onBack={() => navigate("home")} onClaim={() => { setClaimTarget(foundReport); requireAccount("claim", "claim"); }} />
+            <MatchView lost={lostReport} found={foundReport} match={primaryMatch} onBack={() => navigate("home")} onClaim={() => { setClaimTarget(foundReport); requireAccount("claim", "claim"); }} />
           )}
           {screen === "create" && <CreateView initialType={reportType} onBack={() => navigate("home")} onPublish={addReport} />}
           {screen === "claim" && <ClaimView report={claimTarget} onBack={() => navigate("match")} onDone={() => navigate("notifications")} showToast={showToast} onSubmit={submitClaim} />}
@@ -564,17 +575,19 @@ function DetailView({ report, onBack, onClaim }: { report: ItemReport; onBack: (
   );
 }
 
-function MatchView({ lost, found, onBack, onClaim }: { lost: ItemReport; found: ItemReport; onBack: () => void; onClaim: () => void }) {
+function MatchView({ lost, found, match, onBack, onClaim }: { lost: ItemReport; found: ItemReport; match?: ApiMatch; onBack: () => void; onClaim: () => void }) {
   const factors = [
-    ["Image", featuredMatch.factors.image],
-    ["Description", featuredMatch.factors.text],
-    ["Details", featuredMatch.factors.attributes],
-    ["Location", featuredMatch.factors.location],
+    ["Image", match?.factors.image ?? featuredMatch.factors.image],
+    ["Description", match?.factors.text ?? featuredMatch.factors.text],
+    ["Details", match?.factors.attributes ?? featuredMatch.factors.attributes],
+    ["Location", match?.factors.location ?? featuredMatch.factors.location],
+    ["Date", match?.factors.date ?? featuredMatch.factors.date],
   ] as const;
+  const score = match?.score ?? featuredMatch.score;
   return (
     <main className="mobile-page match-page">
       <CompactHeader title="Possible match" onBack={onBack} />
-      <section className="match-score-card"><span><Sparkles size={20} /></span><div><p className="micro-label">Good news</p><h1>{featuredMatch.score}% match</h1><p>Two reports share several strong clues.</p></div></section>
+      <section className="match-score-card"><span><Sparkles size={20} /></span><div><p className="micro-label">Good news</p><h1>{score}% match</h1><p>{match ? "This score is based on the reports saved in CampusFind." : "Two sample reports share several strong clues."}</p></div></section>
       <div className="match-pair"><article><div><ReportImage report={lost} /></div><small>Your lost report</small><h3>{lost.title}</h3><p><MapPin size={12} />{lost.location}</p></article><span className="match-connector"><Sparkles size={17} /></span><article><div><ReportImage report={found} /></div><small>Found nearby</small><h3>{found.title}</h3><p><MapPin size={12} />{found.location}</p></article></div>
       <section className="factor-card"><div className="section-title"><div><p className="micro-label">Transparent matching</p><h2>Why it matched</h2></div></div>{factors.map(([label, value]) => <div className="factor-row" key={label}><span><b>{label}</b><em>{value}%</em></span><div><i style={{ width: `${value}%` }} /></div></div>)}<p>Scores help discovery; they do not prove ownership.</p></section>
       <section className="match-next"><ShieldCheck size={21} /><div><strong>Ready to verify?</strong><p>Tell us one private detail that only the real owner should know.</p></div></section>
