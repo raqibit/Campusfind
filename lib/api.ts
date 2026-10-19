@@ -115,6 +115,7 @@ export async function publishReport(
     location: { label: string };
     happenedAt: string;
     imageUrls: string[];
+    imageKeys?: string[];
   },
 ) {
   const response = await request<{ data: ApiReport; meta: { matchesCreated: number } }>(
@@ -158,12 +159,30 @@ export async function createClaim(token: string, input: {
   matchId: string;
   privateDetail: string;
   proofUrls?: string[];
+  proofKeys?: string[];
 }) {
   const response = await request<{ data: { id: string; status: "pending" | "approved" | "rejected" | "more_evidence"; createdAt: string } }>(
     "/claims",
     { method: "POST", body: JSON.stringify(input) },
     token,
   );
+  return response.data;
+}
+
+export async function uploadFile(token: string, file: File, purpose: "report-image" | "claim-evidence") {
+  const allowed = purpose === "report-image" ? ["image/jpeg", "image/png", "image/webp"] : ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+  if (!allowed.includes(file.type)) throw new Error("Choose a JPG, PNG or WEBP image" + (purpose === "claim-evidence" ? ", or a PDF document." : "."));
+  const maxBytes = purpose === "report-image" || file.type.startsWith("image/") ? 8 * 1024 * 1024 : 5 * 1024 * 1024;
+  if (file.size <= 0 || file.size > maxBytes) throw new Error(`This file must be smaller than ${Math.floor(maxBytes / (1024 * 1024))} MB.`);
+  const signed = await request<{ data: { key: string; uploadUrl: string; contentType: string; maxBytes: number } }>("/uploads/presign", { method: "POST", body: JSON.stringify({ purpose, contentType: file.type }) }, token);
+  if (file.size > signed.data.maxBytes) throw new Error("This file exceeds the storage limit.");
+  const uploaded = await fetch(signed.data.uploadUrl, { method: "PUT", headers: { "Content-Type": signed.data.contentType }, body: file });
+  if (!uploaded.ok) throw new Error("The file could not be uploaded. Check storage CORS settings and try again.");
+  return signed.data.key;
+}
+
+export async function getClaimEvidenceUrl(token: string, claimId: string, index: number) {
+  const response = await request<{ data: { url: string; expiresInSeconds: number } }>(`/admin/claims/${encodeURIComponent(claimId)}/evidence/${index}`, {}, token);
   return response.data;
 }
 
