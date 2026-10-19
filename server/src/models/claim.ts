@@ -6,6 +6,7 @@ const claimSchema = new Schema(
     claimant: { type: Types.ObjectId, ref: "User", required: true, index: true },
     privateDetail: { type: String, required: true, trim: true, select: false },
     proofUrls: [{ type: String, trim: true, select: false }],
+    proofKeys: [{ type: String, trim: true, select: false }],
     status: {
       type: String,
       enum: ["pending", "approved", "rejected", "more_evidence"],
