@@ -15,8 +15,8 @@ router.get(
       $or: [{ lostReport: { $in: reportIds } }, { foundReport: { $in: reportIds } }],
       status: { $ne: "rejected" },
     })
-      .populate("lostReport", "title category publicDescription location happenedAt imageUrls reporter status")
-      .populate("foundReport", "title category publicDescription location happenedAt imageUrls reporter status")
+      .populate("lostReport", "type title category publicDescription location happenedAt imageUrls reporter status")
+      .populate("foundReport", "type title category publicDescription location happenedAt imageUrls reporter status")
       .sort({ score: -1, createdAt: -1 })
       .lean();
     response.json({ data: matches });
@@ -27,8 +27,8 @@ router.get(
   "/:matchId",
   asyncRoute(async (request, response) => {
     const match = await Match.findOne({ _id: request.params.matchId, university: request.auth!.universityId })
-      .populate("lostReport", "title category publicDescription location happenedAt imageUrls reporter status")
-      .populate("foundReport", "title category publicDescription location happenedAt imageUrls reporter status")
+      .populate("lostReport", "type title category publicDescription location happenedAt imageUrls reporter status")
+      .populate("foundReport", "type title category publicDescription location happenedAt imageUrls reporter status")
       .lean();
     if (!match) throw new AppError(404, "Match not found.", "MATCH_NOT_FOUND");
     const lost = match.lostReport as unknown as { reporter: { toString(): string } };
