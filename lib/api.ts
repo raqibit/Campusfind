@@ -129,6 +129,7 @@ export async function publishReport(
 
 export interface ApiMatchReport {
   _id: string;
+  type: ReportType;
   title: string;
   category: ItemCategory;
   publicDescription: string;
@@ -136,7 +137,7 @@ export interface ApiMatchReport {
   happenedAt: string;
   imageUrls?: string[];
   reporter?: { _id?: string; fullName?: string };
-  status?: ApiReport["status"];
+  status: ApiReport["status"];
 }
 
 export interface ApiMatch {
