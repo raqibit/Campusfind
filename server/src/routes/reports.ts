@@ -77,6 +77,7 @@ router.post(
   requireAuth,
   asyncRoute(async (request, response) => {
     const input = reportSchema.parse(request.body);
+    if (input.imageUrls.length > 0) throw new AppError(422, "Upload report photos through the secure file upload flow.", "UNSUPPORTED_IMAGE_URL");
     await verifyUserObjects(input.imageKeys, "report-images", request.auth!.universityId, request.auth!.userId);
     let imageEmbedding = input.imageEmbedding;
     const imageForEmbedding = input.imageUrls[0] ?? (input.imageKeys[0] ? await createDownloadUrl(input.imageKeys[0]) : undefined);
@@ -118,7 +119,7 @@ router.patch(
   "/:reportId",
   requireAuth,
   asyncRoute(async (request, response) => {
-    const input = reportSchema.partial().omit({ type: true, imageEmbedding: true, imageKeys: true }).parse(request.body);
+    const input = reportSchema.partial().omit({ type: true, imageEmbedding: true, imageKeys: true, imageUrls: true }).parse(request.body);
     const report = await Report.findOne({ _id: request.params.reportId, university: request.auth!.universityId });
     if (!report) throw new AppError(404, "Report not found.", "REPORT_NOT_FOUND");
     if (report.reporter.toString() !== request.auth!.userId && request.auth!.role !== "admin") {
