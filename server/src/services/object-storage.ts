@@ -86,8 +86,8 @@ function presign(method: "GET" | "PUT" | "HEAD", key: string, contentType?: stri
 export function createUploadUrl(key: string, contentType: string) {
   return presign("PUT", key, contentType, 300);
 }
-export function createDownloadUrl(key: string) {
-  return presign("GET", key, undefined, 300);
+export function createDownloadUrl(key: string, expiresSeconds = 300) {
+  return presign("GET", key, undefined, expiresSeconds);
 }
 export function createHeadUrl(key: string) {
   return presign("HEAD", key, undefined, 60);
