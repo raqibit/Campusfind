@@ -94,7 +94,8 @@ router.post(
 router.get(
   "/:reportId",
   asyncRoute(async (request, response) => {
-    const report = await Report.findById(request.params.reportId)
+    const query = z.object({ universityId: z.string().min(1) }).parse(request.query);
+    const report = await Report.findOne({ _id: request.params.reportId, university: query.universityId })
       .select("-privateDetails -imageEmbedding")
       .populate("reporter", "fullName verified")
       .lean();
@@ -108,7 +109,7 @@ router.patch(
   requireAuth,
   asyncRoute(async (request, response) => {
     const input = reportSchema.partial().omit({ type: true, imageEmbedding: true }).parse(request.body);
-    const report = await Report.findById(request.params.reportId);
+    const report = await Report.findOne({ _id: request.params.reportId, university: request.auth!.universityId });
     if (!report) throw new AppError(404, "Report not found.", "REPORT_NOT_FOUND");
     if (report.reporter.toString() !== request.auth!.userId && request.auth!.role !== "admin") {
       throw new AppError(403, "You cannot edit this report.", "FORBIDDEN");
@@ -124,7 +125,7 @@ router.post(
   requireAuth,
   asyncRoute(async (request, response) => {
     const reportId = String(request.params.reportId);
-    const report = await Report.findById(reportId).lean();
+    const report = await Report.findOne({ _id: reportId, university: request.auth!.universityId }).lean();
     if (!report) throw new AppError(404, "Report not found.", "REPORT_NOT_FOUND");
     if (report.reporter.toString() !== request.auth!.userId && request.auth!.role !== "admin") {
       throw new AppError(403, "You cannot rematch this report.", "FORBIDDEN");
