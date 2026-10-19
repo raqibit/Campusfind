@@ -23,6 +23,8 @@ function requiredConfig() {
 function sha256(value: string) {
   return createHash("sha256").update(value).digest("hex");
 }
+function hmac(key: Buffer | string, value: string, encoding: "hex"): string;
+function hmac(key: Buffer | string, value: string): Buffer;
 function hmac(key: Buffer | string, value: string, encoding?: "hex") {
   const digest = createHmac("sha256", key).update(value);
   return encoding ? digest.digest(encoding) : digest.digest();
