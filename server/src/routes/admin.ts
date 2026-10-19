@@ -20,12 +20,12 @@ router.get(
     const filter: Record<string, unknown> = { match: { $in: matches } };
     if (status) filter.status = status;
     const claims = await Claim.find(filter)
-      .select("+privateDetail +proofUrls +reviewNote")
+      .select("+privateDetail +proofUrls +proofKeys +reviewNote")
       .populate("claimant", "fullName email matricNumber verified")
       .populate({ path: "match", populate: [{ path: "lostReport", select: "+privateDetails title category publicDescription location happenedAt" }, { path: "foundReport", select: "+privateDetails title category publicDescription location happenedAt reporter" }] })
       .sort({ createdAt: 1 })
       .lean();
-    response.json({ data: claims });
+    response.json({ data: claims.map(({ proofKeys, ...claim }) => ({ ...claim, evidenceCount: proofKeys?.length ?? 0 })) });
   }),
 );
 
