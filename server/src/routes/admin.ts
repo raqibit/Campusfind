@@ -7,6 +7,7 @@ import { Claim } from "../models/claim.js";
 import { Handover } from "../models/handover.js";
 import { Match } from "../models/match.js";
 import { Notification } from "../models/notification.js";
+import { createDownloadUrl } from "../services/object-storage.js";
 
 const router = Router();
 router.use(requireAuth, requireAdmin);
@@ -87,6 +88,21 @@ router.patch(
       });
     }
     response.json({ data: { id: claim.id, status: claim.status, reviewedAt: claim.reviewedAt } });
+  }),
+);
+
+
+router.get(
+  "/claims/:claimId/evidence/:index",
+  asyncRoute(async (request, response) => {
+    const index = z.coerce.number().int().min(0).max(4).parse(request.params.index);
+    const claim = await Claim.findById(request.params.claimId).select("+proofKeys").lean();
+    if (!claim) throw new AppError(404, "Claim not found.", "CLAIM_NOT_FOUND");
+    const match = await Match.findOne({ _id: claim.match, university: request.auth!.universityId }).select("_id").lean();
+    if (!match) throw new AppError(404, "Claim not found.", "CLAIM_NOT_FOUND");
+    const key = claim.proofKeys?.[index];
+    if (!key) throw new AppError(404, "Evidence file not found.", "EVIDENCE_NOT_FOUND");
+    response.json({ data: { url: createDownloadUrl(key), expiresInSeconds: 300 } });
   }),
 );
 
