@@ -125,7 +125,7 @@ export async function verifyUserObjects(
   for (const key of keys) {
     const segments = key.split("/");
     const filename = segments[3] ?? "";
-    if (segments.length !== 4 || segments[0] !== scope || segments[1] !== universityId || segments[2] !== userId || !/^[a-f0-9-]+\\.(jpg|png|webp|pdf)$/i.test(filename)) {
+    if (segments.length !== 4 || segments[0] !== scope || segments[1] !== universityId || segments[2] !== userId || !/^[a-f0-9-]+\.(jpg|png|webp|pdf)$/i.test(filename)) {
       throw new AppError(403, "An uploaded file does not belong to this account or file category.", "INVALID_OBJECT_KEY");
     }
     const extension = filename.split(".").at(-1)?.toLowerCase();
