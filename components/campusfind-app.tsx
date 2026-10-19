@@ -7,6 +7,7 @@ import {
   BadgeCheck,
   BatteryFull,
   Bell,
+  Camera,
   BookOpen,
   Check,
   CheckCircle2,
