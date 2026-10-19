@@ -1,5 +1,6 @@
 import { createHash, createHmac, randomUUID } from "node:crypto";
 import { env } from "../config/env.js";
+import { AppError } from "../lib/errors.js";
 
 const configured = Boolean(env.S3_ENDPOINT && env.S3_BUCKET && env.S3_ACCESS_KEY_ID && env.S3_SECRET_ACCESS_KEY);
 
@@ -9,9 +10,7 @@ export function objectStorageConfigured() {
 
 function requiredConfig() {
   if (!configured) {
-    const error = new Error("Object storage is not configured. Set S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY.");
-    Object.assign(error, { status: 503, code: "STORAGE_NOT_CONFIGURED" });
-    throw error;
+    throw new AppError(503, "Object storage is not configured. Set S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY.", "STORAGE_NOT_CONFIGURED");
   }
   return {
     endpoint: new URL(env.S3_ENDPOINT!),
@@ -118,17 +117,13 @@ export async function verifyUserObjects(
 ) {
   const maxCount = 5;
   if (keys.length > maxCount) {
-    const error = new Error("A maximum of five files is allowed.");
-    Object.assign(error, { status: 422, code: "TOO_MANY_FILES" });
-    throw error;
+    throw new AppError(422, "A maximum of five files is allowed.", "TOO_MANY_FILES");
   }
   for (const key of keys) {
     const segments = key.split("/");
     const filename = segments[3] ?? "";
     if (segments.length !== 4 || segments[0] !== scope || segments[1] !== universityId || segments[2] !== userId || !/^[a-f0-9-]+\\.(jpg|png|webp|pdf)$/i.test(filename)) {
-      const error = new Error("An uploaded file does not belong to this account or file category.");
-      Object.assign(error, { status: 403, code: "INVALID_OBJECT_KEY" });
-      throw error;
+      throw new AppError(403, "An uploaded file does not belong to this account or file category.", "INVALID_OBJECT_KEY");
     }
     const extension = filename.split(".").at(-1)?.toLowerCase();
     const type = extension === "jpg" || extension === "jpeg" ? "image/jpeg"
@@ -138,9 +133,7 @@ export async function verifyUserObjects(
     const allowed = scope === "report-images" ? ["image/jpeg", "image/png", "image/webp"] : ["image/jpeg", "image/png", "image/webp", "application/pdf"];
     const maxBytes = type === "application/pdf" ? 5 * 1024 * 1024 : 8 * 1024 * 1024;
     if (!type || !allowed.includes(type) || !(await verifyStoredObject(key, type, maxBytes))) {
-      const error = new Error("An uploaded file is missing, invalid, or exceeds its size limit. Upload it again.");
-      Object.assign(error, { status: 422, code: "INVALID_UPLOAD" });
-      throw error;
+      throw new AppError(422, "An uploaded file is missing, invalid, or exceeds its size limit. Upload it again.", "INVALID_UPLOAD");
     }
   }
 }
