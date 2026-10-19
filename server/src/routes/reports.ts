@@ -80,7 +80,7 @@ router.post(
     if (input.imageUrls.length > 0) throw new AppError(422, "Upload report photos through the secure file upload flow.", "UNSUPPORTED_IMAGE_URL");
     await verifyUserObjects(input.imageKeys, "report-images", request.auth!.universityId, request.auth!.userId);
     let imageEmbedding = input.imageEmbedding;
-    const imageForEmbedding = input.imageUrls[0] ?? (input.imageKeys[0] ? await createDownloadUrl(input.imageKeys[0]) : undefined);
+    const imageForEmbedding = input.imageKeys[0] ? await createDownloadUrl(input.imageKeys[0]) : undefined;
     if (!imageEmbedding && imageForEmbedding) {
       try {
         imageEmbedding = await createImageEmbedding(imageForEmbedding);
