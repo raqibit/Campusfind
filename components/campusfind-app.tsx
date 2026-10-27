@@ -247,12 +247,14 @@ export default function CampusFindApp() {
   useEffect(() => {
     const activeSession = session;
     if (!apiConfigured || !activeSession || activeSession.token === "campusfind-demo-session") return;
+    const sessionToken = activeSession.token;
+    const universityId = activeSession.user.university.id;
     let active = true;
     async function refreshAccountData() {
       const results = await Promise.allSettled([
-        listReports(activeSession.user.university.id),
-        listMyMatches(activeSession.token),
-        listNotifications(activeSession.token),
+        listReports(universityId),
+        listMyMatches(sessionToken),
+        listNotifications(sessionToken),
       ]);
       if (!active) return;
       const [reportsResult, matchesResult, notificationsResult] = results;
@@ -1027,18 +1029,20 @@ function ChatView({ session, matchId, showToast, onBack }: {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
-  const lastMessageAt = useRef<string | undefined>();
+  const lastMessageAt = useRef<string | undefined>(undefined);
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!session || !apiConfigured || session.token === "campusfind-demo-session" || !matchId) return;
+    const sessionToken = session.token;
+    const activeMatchId = matchId;
     let active = true;
     async function refresh(initial = false) {
       try {
         const after = initial ? undefined : lastMessageAt.current
           ? new Date(new Date(lastMessageAt.current).getTime() - 1).toISOString()
           : undefined;
-        const incoming = await listChatMessages(session.token, matchId, after);
+        const incoming = await listChatMessages(sessionToken, activeMatchId, after);
         if (!active) return;
         if (incoming.length) {
           setMessages((current) => {

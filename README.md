@@ -159,7 +159,25 @@ npm run server:build
 npm run server:test
 ```
 
-The automated suite verifies the token, embedding and weighted-match calculations. API integration tests should be run with a disposable MongoDB and object store before production use.
+The default automated suite verifies the token, embedding and weighted-match calculations. The opt-in API integration suite exercises authentication guards, university-scoped chat access, contact-detail blocking, claims, administrator review, notifications and two-party handover completion against a disposable MongoDB database.
+
+Start the local services first:
+
+```powershell
+docker compose up -d mongo minio
+```
+
+Run the integration suite against a separate database. The test does not call OpenAI, SMTP, OAuth providers or object storage, so those services do not need production credentials:
+
+```powershell
+$env:NODE_ENV = "test"
+$env:MONGODB_URI = "mongodb://127.0.0.1:27017/campusfind_integration"
+$env:JWT_SECRET = "local-integration-secret-change-me-32-characters"
+$env:RUN_API_INTEGRATION_TESTS = "1"
+npm run server:test:integration
+```
+
+The test drops only the database named in `MONGODB_URI` and closes its temporary HTTP server when it finishes. Use a disposable database name and do not point it at a shared or production MongoDB instance.
 
 ## Deliberate MVP limits
 

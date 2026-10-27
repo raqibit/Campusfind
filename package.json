@@ -16,7 +16,8 @@
     "server:build": "tsc -p server/tsconfig.json",
     "server:start": "node server/dist/index.js",
     "server:seed": "tsx server/src/seed.ts",
-    "server:test": "node --import tsx --test server/tests/**/*.test.ts"
+    "server:test": "node --import tsx --test server/tests/**/*.test.ts",
+    "server:test:integration": "node --import tsx --test server/tests/api.integration.test.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1157.0",

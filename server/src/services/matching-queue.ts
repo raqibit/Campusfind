@@ -71,9 +71,6 @@ async function enrichReport(reportId: string) {
           contentType as "image/jpeg" | "image/png" | "image/webp",
         );
         if (imageAnalysis) {
-          const imageText = [imageAnalysis.itemType, ...imageAnalysis.dominantColours, ...imageAnalysis.visibleMaterials, ...imageAnalysis.distinctiveFeatures, imageAnalysis.brand]
-            .filter(Boolean)
-            .join(". ");
           update.imageAnalysis = imageAnalysis;
           update.imageAnalysisModel = env.OPENAI_VISION_MODEL;
         }
