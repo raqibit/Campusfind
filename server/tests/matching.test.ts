@@ -11,6 +11,7 @@ const lost: MatchableReport = {
   location: { label: "Kenneth Dike Library" },
   happenedAt: "2026-08-24T09:00:00.000Z",
   imageEmbedding: [0.7, 0.2, 0.1],
+  imageEmbeddingModel: "external-image-embedding",
 };
 
 const found: MatchableReport = {
@@ -22,6 +23,7 @@ const found: MatchableReport = {
   location: { label: "Kenneth Dike Library entrance" },
   happenedAt: "2026-08-24T11:00:00.000Z",
   imageEmbedding: [0.69, 0.21, 0.1],
+  imageEmbeddingModel: "external-image-embedding",
 };
 
 test("token similarity rewards shared descriptive terms", () => {
@@ -49,6 +51,11 @@ test("text vectors from different models fall back to token comparison", () => {
   const left = { ...lost, textEmbedding: [1, 0, 0], textEmbeddingModel: "model-a" };
   const right = { ...found, textEmbedding: [1, 0, 0], textEmbeddingModel: "model-b" };
   assert.equal(scoreReports(left, right).factors.text, tokenSimilarity(`${lost.title} ${lost.publicDescription}`, `${found.title} ${found.publicDescription}`));
+});
+
+test("image vectors from different providers use the neutral image score", () => {
+  const result = scoreReports(lost, { ...found, imageEmbeddingModel: "different-provider" });
+  assert.equal(result.factors.image, 50);
 });
 
 test("a dissimilar category receives a weaker score", () => {

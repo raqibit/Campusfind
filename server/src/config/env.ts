@@ -9,6 +9,7 @@ const schema = z.object({
   CLIENT_ORIGIN: z.string().default("http://localhost:5173,http://localhost:3000"),
   IMAGE_EMBEDDING_API_URL: z.string().url().optional().or(z.literal("")),
   IMAGE_EMBEDDING_API_KEY: z.string().optional(),
+  IMAGE_EMBEDDING_MODEL: z.string().trim().min(1).default("external-image-embedding"),
   OPENAI_API_KEY: z.string().optional(),
   OPENAI_EMBEDDING_MODEL: z.string().default("text-embedding-3-small"),
   OPENAI_VISION_MODEL: z.string().default("gpt-4o-mini"),

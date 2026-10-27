@@ -112,7 +112,7 @@ In development, verification codes are printed to the API console when SMTP is n
 | `API_PUBLIC_URL` | Public API origin used for report-photo URLs and OAuth callbacks. |
 | `S3_ENDPOINT` / `S3_PUBLIC_ENDPOINT` | Private storage endpoint used by the API and signed URLs. |
 | `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | Private media bucket and credentials. |
-| `IMAGE_EMBEDDING_API_URL` / `IMAGE_EMBEDDING_API_KEY` | Optional image-vector provider; the API sends it a short-lived photo URL. |
+| `IMAGE_EMBEDDING_API_URL` / `IMAGE_EMBEDDING_API_KEY` / `IMAGE_EMBEDDING_MODEL` | Optional image-vector provider and stable model label; the API sends it a short-lived photo URL and compares vectors only when both reports use the same label. |
 | `OPENAI_API_KEY` | Optional server-only key for text embeddings and opt-in photo descriptions. |
 | `OPENAI_EMBEDDING_MODEL` / `OPENAI_VISION_MODEL` | Optional model names for semantic and visual matching. |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `EMAIL_FROM` | Email verification and password-reset delivery. |

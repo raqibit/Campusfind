@@ -28,6 +28,7 @@ const reportSchema = new Schema(
     imageUrls: [{ type: String, trim: true }],
     imageKeys: { type: [String], select: false, default: undefined },
     imageEmbedding: { type: [Number], select: false, default: undefined },
+    imageEmbeddingModel: { type: String, trim: true, default: null, select: false },
     imageDescriptorEmbedding: { type: [Number], select: false, default: undefined },
     imageDescriptorEmbeddingModel: { type: String, trim: true, default: null, select: false },
     imageAnalysisModel: { type: String, trim: true, default: null, select: false },

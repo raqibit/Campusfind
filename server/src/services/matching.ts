@@ -15,6 +15,7 @@ export interface MatchableReport {
   location: { label: string; latitude?: number | null; longitude?: number | null };
   happenedAt: Date | string;
   imageEmbedding?: number[] | null;
+  imageEmbeddingModel?: string | null;
   imageDescriptorEmbedding?: number[] | null;
   imageDescriptorEmbeddingModel?: string | null;
   textEmbedding?: number[] | null;
@@ -101,7 +102,12 @@ function dateSimilarity(left: MatchableReport, right: MatchableReport) {
 }
 
 export function scoreReports(left: MatchableReport, right: MatchableReport) {
-  const hasProviderVectors = Boolean(left.imageEmbedding?.length && right.imageEmbedding?.length);
+  const hasProviderVectors = Boolean(
+    left.imageEmbedding?.length &&
+    right.imageEmbedding?.length &&
+    left.imageEmbeddingModel &&
+    left.imageEmbeddingModel === right.imageEmbeddingModel,
+  );
   const hasCompatibleDescriptors = Boolean(
     left.imageDescriptorEmbedding?.length &&
     right.imageDescriptorEmbedding?.length &&
@@ -129,7 +135,7 @@ export function scoreReports(left: MatchableReport, right: MatchableReport) {
 }
 
 export async function createMatchSuggestions(reportId: string, threshold = 60, notificationThreshold = 75) {
-  const report = await Report.findById(reportId).select("+imageEmbedding +imageDescriptorEmbedding +imageDescriptorEmbeddingModel +textEmbedding").lean();
+  const report = await Report.findById(reportId).select("+imageEmbedding +imageEmbeddingModel +imageDescriptorEmbedding +imageDescriptorEmbeddingModel +textEmbedding").lean();
   if (!report) return [];
 
   const earliest = new Date(new Date(report.happenedAt).getTime() - 90 * 86_400_000);
@@ -141,7 +147,7 @@ export async function createMatchSuggestions(reportId: string, threshold = 60, n
     status: { $in: ["open", "matched"] },
     happenedAt: { $gte: earliest, $lte: latest },
   })
-    .select("+imageEmbedding +imageDescriptorEmbedding +imageDescriptorEmbeddingModel +textEmbedding")
+    .select("+imageEmbedding +imageEmbeddingModel +imageDescriptorEmbedding +imageDescriptorEmbeddingModel +textEmbedding")
     .limit(200)
     .lean();
 

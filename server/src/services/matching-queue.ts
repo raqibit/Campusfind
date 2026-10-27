@@ -54,7 +54,7 @@ function embeddingInput(report: {
 
 async function enrichReport(reportId: string) {
   const report = await Report.findById(reportId)
-    .select("+imageKeys +matchingConsentAt +imageEmbedding +imageDescriptorEmbedding +imageDescriptorEmbeddingModel +imageAnalysis +imageAnalysisModel +textEmbedding +textEmbeddingSourceHash")
+    .select("+imageKeys +matchingConsentAt +imageEmbedding +imageEmbeddingModel +imageDescriptorEmbedding +imageDescriptorEmbeddingModel +imageAnalysis +imageAnalysisModel +textEmbedding +textEmbeddingSourceHash")
     .lean();
   if (!report) return;
 
@@ -90,9 +90,10 @@ async function enrichReport(reportId: string) {
         console.warn("Visual descriptor embedding was skipped; other match signals remain available.", error);
       }
     }
-    if (!report.imageEmbedding) {
+    if (!report.imageEmbedding || report.imageEmbeddingModel !== env.IMAGE_EMBEDDING_MODEL) {
       try { update.imageEmbedding = await createImageEmbedding(await createDownloadUrl(key, 300)); }
       catch (error) { console.warn("Image-vector provider was skipped; other match signals remain available.", error); }
+      if (env.IMAGE_EMBEDDING_API_URL) update.imageEmbeddingModel = env.IMAGE_EMBEDDING_MODEL;
     }
   }
 
