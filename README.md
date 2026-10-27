@@ -143,7 +143,10 @@ Never commit a populated `.env` file. `.env.example` contains names and safe loc
 | `GET/POST` | `/api/chats/:matchId/messages` | Match participants after claim | Read or send private case messages. |
 | `POST` | `/api/claims` | Lost-item owner | Submit private ownership evidence or resubmit after an evidence request. |
 | `GET` | `/api/claims/my` | Signed in | Track claim decisions without exposing private evidence. |
-| `GET` | `/api/notifications` | Signed in | View match, claim, handover and chat alerts. |
+| `GET` | `/api/notifications` | Signed in | View paginated match, claim, handover and chat alerts. |
+| `PATCH` | `/api/notifications/:notificationId/read` | Signed in | Mark one notification as read. |
+| `PATCH` | `/api/notifications/read-all` | Signed in | Mark all notifications as read. |
+| `GET` | `/api/admin/audit` | Administrator | View university-scoped claim and handover audit events. |
 | `GET` | `/api/admin/claims` | Administrator | Review open claims and private verification details for the university. |
 | `PATCH` | `/api/admin/claims/:id` | Administrator | Decide a claim and schedule handover. |
 | `GET` | `/api/handovers/my` | Owner or finder | View handovers linked to the user's reports. |
@@ -179,6 +182,20 @@ npm run server:test:integration
 
 The test drops only the database named in `MONGODB_URI` and closes its temporary HTTP server when it finishes. Use a disposable database name and do not point it at a shared or production MongoDB instance.
 
+For a complete local smoke test, run the API and web client in separate terminals after the integration suite:
+
+```powershell
+$env:CLIENT_ORIGIN = "http://localhost:3000"
+npm run server:dev
+```
+
+```powershell
+$env:NEXT_PUBLIC_API_BASE_URL = "http://localhost:5000/api"
+npm run dev
+```
+
+Then verify registration, email verification, report-photo upload, matching, notifications, claim evidence, participant-only chat, administrator review, and two-party handover confirmation in the browser. OAuth callbacks require HTTPS-compatible public URLs and real provider credentials; the local email fallback prints verification codes in the API console.
+
 ## Deliberate MVP limits
 
 - Responsive web/PWA delivery comes before native Android or iOS binaries.
@@ -186,6 +203,8 @@ The test drops only the database named in `MONGODB_URI` and closes its temporary
 - Location is a selected campus landmark or optional point, not continuous GPS tracking.
 - Ownership release always requires a person; there is no automatic approval.
 - Chat is limited to the two report participants after a claim is submitted; it polls while the chat screen is open and blocks email addresses and phone numbers.
+- Administrative claim decisions and handover confirmations are recorded in a university-scoped audit log.
+- Notifications and audit records are paginated; clients should request only the page size they need.
 - Native mobile apps, blockchain, WhatsApp automation and cross-university discovery are postponed until the recovery workflow is proven.
 
 This keeps the final-year project achievable while still demonstrating interface design, full-stack TypeScript, database modelling, authentication, ranked matching, privacy controls and an auditable administrative workflow.

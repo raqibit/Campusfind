@@ -4,6 +4,7 @@ import { z } from "zod";
 import { asyncRoute, AppError } from "../lib/errors.js";
 import { requireAdmin, requireAuth } from "../middleware/auth.js";
 import { Claim } from "../models/claim.js";
+import { AuditEvent } from "../models/audit-event.js";
 import { Handover } from "../models/handover.js";
 import { Match } from "../models/match.js";
 import { Notification } from "../models/notification.js";
@@ -13,6 +14,31 @@ import { isSafeUploadKey, maxUploadBytes } from "../services/storage-keys.js";
 
 const router = Router();
 router.use(requireAuth, requireAdmin);
+
+router.get(
+  "/audit",
+  asyncRoute(async (request, response) => {
+    const query = z.object({
+      page: z.coerce.number().int().positive().default(1),
+      limit: z.coerce.number().int().min(1).max(100).default(50),
+      action: z.string().trim().min(1).max(80).optional(),
+    }).parse(request.query);
+    const filter = {
+      university: request.auth!.universityId,
+      ...(query.action ? { action: query.action } : {}),
+    };
+    const [events, total] = await Promise.all([
+      AuditEvent.find(filter)
+        .populate("actor", "fullName email role")
+        .sort({ createdAt: -1 })
+        .skip((query.page - 1) * query.limit)
+        .limit(query.limit)
+        .lean(),
+      AuditEvent.countDocuments(filter),
+    ]);
+    response.json({ data: events, meta: { page: query.page, limit: query.limit, total } });
+  }),
+);
 
 router.get(
   "/claims",
@@ -87,6 +113,15 @@ router.patch(
     claim.reviewer = request.auth!.userId as never;
     claim.reviewedAt = new Date();
     await claim.save();
+    await AuditEvent.create({
+      university: request.auth!.universityId,
+      actor: request.auth!.userId,
+      action: `claim.${input.status}`,
+      targetType: "claim",
+      targetId: claim.id,
+      metadata: { reviewNote: input.reviewNote, handoverPoint: input.handoverPoint, scheduledFor: input.scheduledFor },
+      ipAddress: request.ip,
+    });
 
     if (input.status === "approved") {
       match.status = "approved";

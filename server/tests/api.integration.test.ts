@@ -179,6 +179,15 @@ if (!process.env.RUN_API_INTEGRATION_TESTS) {
     });
     assert.equal(review.response.status, 200);
 
+    const audit = await request("/api/admin/audit?limit=10", { headers: auth(fixture.admin) });
+    assert.equal(audit.response.status, 200);
+    assert.ok((audit.body?.data as Array<Record<string, unknown>>).some((event) => event.action === "claim.approved"));
+
+    const notifications = await request("/api/notifications?page=1&limit=10", { headers: auth(fixture.finder) });
+    assert.equal(notifications.response.status, 200);
+    assert.equal((notifications.body?.data as Array<unknown>).length >= 1, true);
+    assert.equal((notifications.body?.meta as Record<string, unknown>).unread, 2);
+
     const handovers = await request("/api/handovers/my", { headers: auth(fixture.owner) });
     assert.equal(handovers.response.status, 200);
     const handoverId = String(((handovers.body?.data as Array<Record<string, unknown>>)[0])?._id);

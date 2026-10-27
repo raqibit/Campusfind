@@ -3,6 +3,7 @@ import { z } from "zod";
 import { asyncRoute, AppError } from "../lib/errors.js";
 import { requireAuth } from "../middleware/auth.js";
 import { Claim } from "../models/claim.js";
+import { AuditEvent } from "../models/audit-event.js";
 import { Handover } from "../models/handover.js";
 import { Match } from "../models/match.js";
 import { Notification } from "../models/notification.js";
@@ -78,6 +79,15 @@ router.patch(
       handover.completedAt = new Date();
     }
     await handover.save();
+    await AuditEvent.create({
+      university: request.auth!.universityId,
+      actor: request.auth!.userId,
+      action: `handover.${input.party}_confirmed`,
+      targetType: "handover",
+      targetId: handover.id,
+      metadata: { completed: completedNow },
+      ipAddress: request.ip,
+    });
 
     if (completedNow) {
       await Report.updateMany(

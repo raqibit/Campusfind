@@ -2,6 +2,7 @@ import { createHash, createHmac, randomBytes, randomInt, timingSafeEqual } from 
 import { Router } from "express";
 import type { Request, Response } from "express";
 import bcrypt from "bcryptjs";
+import { rateLimit } from "express-rate-limit";
 import { z } from "zod";
 import { Types } from "mongoose";
 import { asyncRoute, AppError } from "../lib/errors.js";
@@ -18,6 +19,20 @@ import { verifyProviderIdToken, exchangeOAuthCode, providerAuthorizationUrl, typ
 
 const router = Router();
 const providerSchema = z.enum(["google", "apple"]);
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  message: { error: { code: "LOGIN_RATE_LIMITED", message: "Too many sign-in attempts. Please try again later." } },
+});
+const resetLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 5,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  message: { error: { code: "RESET_RATE_LIMITED", message: "Too many password reset attempts. Please try again later." } },
+});
 const registerSchema = z.object({
   fullName: z.string().trim().min(3).max(80),
   email: z.string().email().transform((value) => value.toLowerCase()),
@@ -185,6 +200,7 @@ router.post(
 
 router.post(
   "/login",
+  loginLimiter,
   asyncRoute(async (request, response) => {
     const input = loginSchema.parse(request.body);
     const user = await User.findOne({ email: input.email }).select("+passwordHash").populate("university", "name shortName active");
@@ -201,6 +217,7 @@ router.post(
 
 router.post(
   "/password-reset/request",
+  resetLimiter,
   asyncRoute(async (request, response) => {
     const input = emailSchema.parse(request.body);
     const user = await User.findOne({ email: input.email, verified: true });
@@ -211,6 +228,7 @@ router.post(
 
 router.post(
   "/password-reset/confirm",
+  resetLimiter,
   asyncRoute(async (request, response) => {
     const input = z.object({ email: z.string().email().transform((value) => value.toLowerCase()), code: z.string().regex(/^\d{6}$/), password: z.string().min(8).max(128) }).parse(request.body);
     const user = await User.findOne({ email: input.email }).select("+passwordHash");

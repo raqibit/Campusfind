@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { z } from "zod";
 import { asyncRoute } from "../lib/errors.js";
 import { requireAuth } from "../middleware/auth.js";
 import { Notification } from "../models/notification.js";
@@ -9,8 +10,18 @@ router.use(requireAuth);
 router.get(
   "/",
   asyncRoute(async (request, response) => {
-    const notifications = await Notification.find({ user: request.auth!.userId }).sort({ createdAt: -1 }).limit(100).lean();
-    response.json({ data: notifications });
+    const query = z.object({
+      page: z.coerce.number().int().positive().default(1),
+      limit: z.coerce.number().int().min(1).max(50).default(25),
+      unreadOnly: z.enum(["true", "false"]).default("false"),
+    }).parse(request.query);
+    const filter = { user: request.auth!.userId, ...(query.unreadOnly === "true" ? { readAt: null } : {}) };
+    const [notifications, total, unread] = await Promise.all([
+      Notification.find(filter).sort({ createdAt: -1 }).skip((query.page - 1) * query.limit).limit(query.limit).lean(),
+      Notification.countDocuments(filter),
+      Notification.countDocuments({ user: request.auth!.userId, readAt: null }),
+    ]);
+    response.json({ data: notifications, meta: { page: query.page, limit: query.limit, total, unread } });
   }),
 );
 
