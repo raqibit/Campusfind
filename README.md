@@ -104,6 +104,7 @@ In development, verification codes are printed to the API console when SMTP is n
 | Variable | Purpose |
 | --- | --- |
 | `NEXT_PUBLIC_API_BASE_URL` | Browser-visible base URL ending in `/api`. |
+| `NEXT_PUBLIC_SITE_URL` | Public web URL used for metadata and social preview links. |
 | `MONGODB_URI` | MongoDB or MongoDB Atlas connection string. |
 | `JWT_SECRET` | At least 32 random characters used to sign access tokens. |
 | `SEED_ADMIN_PASSWORD` | Private local password used only while creating the demonstration administrator. |

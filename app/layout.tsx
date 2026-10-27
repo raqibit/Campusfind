@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"),
   title: "CampusFind — Recover what matters",
   description:
     "A trusted, intelligent lost-and-found platform for the University of Ibadan community.",
